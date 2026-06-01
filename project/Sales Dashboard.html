@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SafeSight · Sales Dashboard YTD</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="dashboard/styles.css">
+</head>
+<body>
+<div class="wrap" data-screen-label="Sales Dashboard">
+
+  <!-- Header -->
+  <header class="topbar">
+    <div class="brand">
+      <div class="logo" id="brandLogo">S</div>
+      <div>
+        <h1>Sales Dashboard</h1>
+        <div class="sub">SafeSight — New logo &amp; Upsell performance</div>
+      </div>
+    </div>
+    <div class="tabs">
+      <button class="tabbtn" data-tab="overview">Overview</button>
+      <button class="tabbtn" data-tab="pipeline">Pipeline</button>
+    </div>
+    <div class="spacer"></div>
+    <div class="toolbar">
+      <button class="btn primary" id="uploadBtn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M12 4l-5 5M12 4l5 5"></path><path d="M4 18v2h16v-2"></path></svg>
+        Update data
+      </button>
+      <input type="file" id="fileInput" accept=".xlsx" class="hidden">
+    </div>
+  </header>
+
+  <!-- Control bar -->
+  <div class="controls">
+    <div class="select-wrap"><select class="ctl" id="yearSel"></select></div>
+    <div class="seg" id="granSeg">
+      <button data-g="quarter">Quarter</button>
+      <button data-g="month">Month</button>
+    </div>
+    <div class="seg" id="qSeg" title="Focus a quarter to track its goal">
+      <button data-q="all">YTD</button>
+      <button data-q="0">Q1</button>
+      <button data-q="1">Q2</button>
+      <button data-q="2">Q3</button>
+      <button data-q="3">Q4</button>
+    </div>
+    <div class="select-wrap"><select class="ctl" id="cmpSel"></select></div>
+    <button class="btn" id="vlToggle" title="Add Renewal stream to charts">+ Renewal</button>
+    <span class="cdiv"></span>
+    <div class="select-wrap"><select class="ctl" id="repSel"></select></div>
+    <div class="select-wrap"><select class="ctl" id="coSel"></select></div>
+    <button class="btn ghost" id="goalsBtn" title="Edit quarterly goals">⚲ Goals</button>
+    <button class="btn ghost" id="resetBtn" title="Revert to the original snapshot">Reset</button>
+    <span class="updated" id="updated"></span>
+  </div>
+
+  <!-- ============ OVERVIEW TAB ============ -->
+  <div id="tab-overview">
+    <section class="kpis">
+      <div class="panel kpi hero">
+        <div class="ptitle">Sales · <span id="ytdLabel"></span></div>
+        <div class="big" id="kpiSales">—</div>
+        <div class="meta" id="kpiSalesMeta"></div>
+        <div class="progress">
+          <div class="ptrack"><div class="pfill" id="pfill" style="width:0"></div></div>
+          <div class="pmeta">
+            <span class="pct" id="ppct">0%</span>
+            <span class="goal goal-link" id="goalLink" title="Click to edit goals"><span id="scopeNote">Goal</span> <b id="goalAmt"></b> ✎</span>
+          </div>
+          <div class="pmeta"><span class="goal" id="pGoalNote"></span><span class="goal" id="dealCount"></span></div>
+        </div>
+      </div>
+
+      <div class="panel kpi">
+        <div class="ptitle"><span class="dot nl"></span> New logo</div>
+        <div class="big" id="kpiNL">—</div>
+        <div class="kpitrack"><div class="kpifill nl" id="pNLfill"></div></div>
+        <div class="meta" id="kpiNLMeta"></div>
+      </div>
+      <div class="panel kpi">
+        <div class="ptitle"><span class="dot us"></span> Upsell</div>
+        <div class="big" id="kpiUS">—</div>
+        <div class="kpitrack"><div class="kpifill us" id="pUSfill"></div></div>
+        <div class="meta" id="kpiUSMeta"></div>
+      </div>
+      <div class="panel kpi">
+        <div class="ptitle"><span class="dot vl"></span> Renewal</div>
+        <div class="big" id="kpiVL">—</div>
+        <div class="meta" id="kpiVLMeta"></div>
+      </div>
+    </section>
+
+    <section class="grid-main">
+      <div class="panel">
+        <div class="panel-head">
+          <h2 id="mainTitle">Sales by quarter</h2>
+          <div class="legend">
+            <span id="stackLegend"><span class="dot nl"></span> New logo &nbsp;<span class="dot us"></span> Upsell</span>
+            <span id="curLegBox" class="hidden"></span>
+            <span id="cmpLegend" class="hidden"><span class="sw cur"></span> <span id="curLegYear"></span> &nbsp;<span class="sw cmp"></span> <span id="cmpLegYear"></span></span>
+            <span id="vlLegend" class="hidden"><span class="dot vl"></span> Renewal</span>
+            <span id="goalLegend"><span class="tickleg"></span> Goal</span>
+          </div>
+        </div>
+        <div class="chart" id="mainChart"></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head"><h2>Mix</h2></div>
+        <div class="donut-wrap">
+          <div id="donut"></div>
+          <div class="donut-legend" id="donutLegend"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="grid-streams">
+      <div class="panel">
+        <div class="panel-head">
+          <h2><span class="dot nl"></span> New logo</h2>
+          <span class="streamtot" id="nlTotal"></span>
+        </div>
+        <div class="chart" id="nlChart"></div>
+      </div>
+      <div class="panel">
+        <div class="panel-head">
+          <h2><span class="dot us"></span> Upsell</h2>
+          <span class="streamtot" id="usTotal"></span>
+        </div>
+        <div class="chart" id="usChart"></div>
+      </div>
+    </section>
+
+    <section class="grid-lower2">
+      <div class="panel">
+        <div class="panel-head"><h2>Rep leaderboard</h2></div>
+        <div class="lb" id="lb"></div>
+      </div>
+      <div class="panel">
+        <div class="panel-head"><h2>Latest won deals</h2></div>
+        <table class="deals">
+          <thead><tr><th>Deal</th><th>Customer</th><th>Type</th><th>Owner</th><th>Date</th><th style="text-align:right">Value</th></tr></thead>
+          <tbody id="dealsBody"></tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+
+  <!-- ============ PIPELINE TAB ============ -->
+  <div id="tab-pipeline" class="hidden">
+    <div class="pipe-note">Pipeline split by the sheet's <b>Pipeline</b> column — <span class="dot" style="background:var(--newlogo)"></span> New logo's vs <span class="dot" style="background:var(--upsell)"></span> Customer Growth — per quarter for <b id="pipeYear"></b>.</div>
+    <section class="pipe-cards" id="pipeCards"></section>
+    <section class="grid-main">
+      <div class="panel">
+        <div class="panel-head">
+          <h2>Pipeline by quarter</h2>
+          <div class="legend"><span><span class="dot nl"></span> New logo's</span><span><span class="dot us"></span> Customer Growth</span></div>
+        </div>
+        <div class="chart" id="pipeChart"></div>
+      </div>
+      <div class="panel">
+        <div class="panel-head"><h2>Totals</h2></div>
+        <div class="pipe-totals" id="pipeTotals"></div>
+      </div>
+    </section>
+    <section id="pipeTableWrap"></section>
+  </div>
+
+</div>
+
+<!-- goals modal -->
+<div class="modal" id="goalsModal">
+  <div class="modal-box">
+    <div class="modal-head"><h2>Goals — New logo + Upsell · <span id="goalsYear"></span></h2><button class="xbtn" id="goalsClose">✕</button></div>
+    <table class="goals-table">
+      <thead><tr><th>Quarter</th><th>New logo</th><th>Upsell</th><th>NL + Up</th></tr></thead>
+      <tbody id="goalsBody"></tbody>
+      <tfoot><tr><td>Total</td><td id="gTotNL"></td><td id="gTotUS"></td><td id="gTotAll"></td></tr></tfoot>
+    </table>
+    <div class="modal-foot"><button class="btn" id="goalsClose2" onclick="document.getElementById('goalsModal').classList.remove('show')">Cancel</button><button class="btn primary" id="goalsSave">Save goals</button></div>
+  </div>
+</div>
+
+<!-- drag & drop overlay -->
+<div class="drop" id="drop"><div class="box"><h3>Drop your .xlsx to update</h3><p>The dashboard recalculates everything from the file</p></div></div>
+<div class="toast" id="toast"></div>
+
+<script src="dashboard/embedded-data.js"></script>
+<script src="dashboard/parser.js"></script>
+<script src="dashboard/app.js"></script>
+</body>
+</html>
