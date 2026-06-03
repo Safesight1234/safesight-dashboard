@@ -754,8 +754,10 @@
 
   async function exportFinance() {
     try {
+      console.log('Export Finance clicked');
       const y = state.year;
       const deals = wonDealsForYear(y).filter(d => !d.status || d.status === 'won');
+      console.log('Found deals:', deals.length);
 
       if (!deals.length) { toast('No won deals to export for ' + y); return; }
 
@@ -812,7 +814,12 @@
     const fi = $('#fileInput');
     $('#uploadBtn').addEventListener('click', () => fi.click());
     fi.addEventListener('change', e => { if (e.target.files[0]) loadFile(e.target.files[0]); });
-    $('#finExportBtn').addEventListener('click', exportFinance);
+    const expBtn = $('#finExportBtn');
+    if (expBtn) {
+      expBtn.addEventListener('click', exportFinance);
+    } else {
+      console.error('Export Finance button not found');
+    }
 
     const drop = $('#drop'); let dc = 0;
     window.addEventListener('dragenter', e => { e.preventDefault(); dc++; drop.classList.add('show'); });
