@@ -66,7 +66,7 @@ exports.handler = async () => {
 
     const [pipelines, fields, users] = await Promise.all([
       tlPost('dealPipelines.list', {}, token),
-      tlPost('customFieldDefinitions.list', { filter: { context: 'deal' }, page: { size: 100 } }, token),
+      tlPost('customFieldDefinitions.list', { page: { size: 100 } }, token),
       tlPost('users.list', { page: { size: 100 } }, token),
     ]);
 
