@@ -21,7 +21,7 @@
   for (const y in SEED) if (!GOALS[y]) GOALS[y] = { nl: SEED[y].nl.slice(), us: SEED[y].us.slice() };
 
   const state = Object.assign(
-    { tab: 'overview', year: null, gran: 'quarter', quarter: 'all', compare: 'none', includeVL: false, rep: 'all', country: 'all', currency: 'eur', theme: 'dark' },
+    { tab: 'overview', year: null, gran: 'quarter', quarter: 'all', compare: 'none', rep: 'all', currency: 'eur', theme: 'dark' },
     (() => { try { return JSON.parse(localStorage.getItem(LS.state)) || {}; } catch (e) { return {}; } })()
   );
 
@@ -68,8 +68,7 @@
 
   function applyFilters(arr) {
     return arr.filter(d =>
-      (state.rep === 'all' || d.rep === state.rep) &&
-      (state.country === 'all' || d.co === state.country));
+      (state.rep === 'all' || d.rep === state.rep));
   }
   function wonDealsForYear(y)  { return applyFilters(DATA.deals.filter(d => yearOf(d.d) === y && isWon(d))); }
   function openDealsForYear(y) { return applyFilters(DATA.deals.filter(d => yearOf(d.d) === y && isOpen(d))); }
@@ -155,13 +154,10 @@
     $$('#currencySeg button').forEach(b => b.classList.toggle('active', b.dataset.cur === state.currency));
     $$('#granSeg button').forEach(b => b.classList.toggle('active', b.dataset.g === state.gran));
     $$('#qSeg button').forEach(b => b.classList.toggle('active', b.dataset.q === String(state.quarter)));
-    $('#vlToggle').classList.toggle('active', state.includeVL);
     $('#cmpSel').innerHTML = '<option value="none">No comparison</option>' +
       ys.filter(y => y !== state.year).map(y => `<option value="${y}" ${String(y) === state.compare ? 'selected' : ''}>Compare vs ${y}</option>`).join('');
     const reps = ['all', ...[...new Set(DATA.deals.map(d => d.rep).filter(Boolean))].sort()];
     $('#repSel').innerHTML = reps.map(r => `<option value="${r}" ${r === state.rep ? 'selected' : ''}>${r === 'all' ? 'All reps' : r}</option>`).join('');
-    const cos = ['all', ...[...new Set(DATA.deals.map(d => d.co).filter(Boolean))].sort()];
-    $('#coSel').innerHTML = cos.map(c => `<option value="${c}" ${c === state.country ? 'selected' : ''}>${c === 'all' ? 'All countries' : c}</option>`).join('');
   }
 
   function progressBlock(actual, goal) {
@@ -182,18 +178,17 @@
     const cmp = state.compare !== 'none' ? +state.compare : null;
     const scC = cmp ? scopeFor(cmp, sc) : null;
 
-    // won-only scope for goal tracking
     const scWon = scopeWon(y);
     const wonSales = scWon.nl + scWon.us;
     const pipeNL = sc.nl - scWon.nl, pipeUS = sc.us - scWon.us;
-    const pr = progressBlock(wonSales, sc.gComb);
+    const pr = progressBlock(wonSales, scWon.gComb);
     $('#kpiSales').textContent = fmtMoney(wonSales);
     $('#ytdLabel').textContent = sc.label + (sc.isQ ? '' : ' · YTD');
     $('#scopeNote').textContent = sc.isQ ? 'Quarter goal' : 'Annual goal';
     $('#pfill').style.width = Math.min(100, pr.pct) + '%';
     $('#ppct').textContent = pr.pctTxt;
-    $('#goalAmt').textContent = fmtMoney(sc.gComb);
-    $('#pGoalNote').textContent = fmtMoney(wonSales) + ' won · ' + fmtMoney(sc.nl + sc.us - wonSales) + ' pipeline';
+    $('#goalAmt').textContent = fmtMoney(scWon.gComb);
+    $('#pGoalNote').textContent = fmtMoney(wonSales) + ' won';
     $('#dealCount').textContent = scWon.n + ' won · ' + (sc.n - scWon.n) + ' open';
     $('#kpiSalesMeta').innerHTML = cmp ? deltaHTML(wonSales, scC.nl + scC.us, cmp) : '';
 
@@ -445,7 +440,7 @@
     if (state.quarter !== 'all') arr = arr.filter(d => quarterOf(d.d) === +state.quarter);
     const rows = arr.slice().sort((a, b) => b.d.localeCompare(a.d)).slice(0, 8);
     body.innerHTML = rows.length ? rows.map(d => {
-      const amt = d.nl + d.us + d.vl;
+      const amt = d.nl + d.us;
       return `<tr><td class="name">${esc(d.t || d.c)}</td><td>${esc(d.c)}</td><td>${typePill(d)}</td><td>${esc(d.rep || '—')}</td><td>${d.d}</td><td class="amt">${fmtFull(amt)}</td></tr>`;
     }).join('') : '<tr><td colspan="6" class="empty">No deals in selection</td></tr>';
   }
@@ -457,11 +452,11 @@
     if (state.quarter !== 'all') arr = arr.filter(d => quarterOf(d.d) === +state.quarter);
     arr = arr.slice().sort((a, b) => b.d.localeCompare(a.d));
     const sub = $('#lostSub'), tot = $('#lostTot');
-    const total = arr.reduce((s, d) => s + d.nl + d.us + d.vl, 0);
+    const total = arr.reduce((s, d) => s + d.nl + d.us, 0);
     if (sub) sub.textContent = arr.length + ' deals';
     if (tot) tot.textContent = fmtMoney(total);
     body.innerHTML = arr.length ? arr.slice(0, 30).map(d => {
-      const amt = d.nl + d.us + d.vl;
+      const amt = d.nl + d.us;
       return `<tr><td class="name">${esc(d.t || d.c)}</td><td>${esc(d.c)}</td><td>${typePill(d)}</td><td>${esc(d.rep || '—')}</td><td>${d.lostAt || d.d}</td><td class="amt">${fmtFull(amt)}</td></tr>`;
     }).join('') : '<tr><td colspan="6" class="empty">No lost deals in selection</td></tr>';
   }
@@ -492,14 +487,14 @@
     const openEl = $('#openList'); if (!openEl) return;
     let arr = openDealsForYear(y);
     if (state.quarter !== 'all') arr = arr.filter(d => quarterOf(d.d) === +state.quarter);
-    arr = arr.slice().sort((a, b) => (b.nl + b.us + b.vl) - (a.nl + a.us + a.vl));
-    const max = arr.reduce((m, d) => Math.max(m, d.nl + d.us + d.vl), 1);
-    const total = arr.reduce((s, d) => s + d.nl + d.us + d.vl, 0);
+    arr = arr.slice().sort((a, b) => (b.nl + b.us) - (a.nl + a.us));
+    const max = arr.reduce((m, d) => Math.max(m, d.nl + d.us), 1);
+    const total = arr.reduce((s, d) => s + d.nl + d.us, 0);
     const sub = $('#openSub'), tot = $('#openTot');
     if (sub) sub.textContent = arr.length + ' deals';
     if (tot) tot.textContent = fmtMoney(total);
     openEl.innerHTML = arr.length ? arr.slice(0, 30).map((d, i) => {
-      const v = d.nl + d.us + d.vl;
+      const v = d.nl + d.us;
       return `<div class="wrow">
         <span class="rank">${i + 1}</span>
         <div class="wrow-main">
@@ -515,144 +510,104 @@
     const y = state.year;
     const allOpen = openDealsForYear(y);
     const scoped = state.quarter === 'all' ? allOpen : allOpen.filter(d => quarterOf(d.d) === +state.quarter);
-
-    const qLabel = state.quarter === 'all' ? String(y) : `Q${+state.quarter + 1} '${String(y).slice(2)}`;
-    const wt = d => (d.nl + d.us + d.vl) * (d.prob || 0);
+    const today = new Date();
 
     const nlDeals  = scoped.filter(d => d.pi === "New logo's");
     const usDeals  = scoped.filter(d => d.pi === 'Customer Growth');
     const vlDeals  = scoped.filter(d => d.vl > 0);
-    const nlTotal  = nlDeals.reduce((s, d) => s + d.nl + d.us, 0);
-    const usTotal  = usDeals.reduce((s, d) => s + d.nl + d.us, 0);
+    const nlTotal  = nlDeals.reduce((s, d) => s + d.nl, 0);
+    const usTotal  = usDeals.reduce((s, d) => s + d.us, 0);
     const vlTotal  = vlDeals.reduce((s, d) => s + d.vl, 0);
-    const allTotal = scoped.reduce((s, d) => s + d.nl + d.us + d.vl, 0);
-    const nlWt = nlDeals.reduce((s, d) => s + wt(d), 0);
-    const usWt = usDeals.reduce((s, d) => s + wt(d), 0);
-    const vlWt = vlDeals.reduce((s, d) => s + wt(d), 0);
-    const allWt = scoped.reduce((s, d) => s + wt(d), 0);
+    const pipeTotal = nlTotal + usTotal;
 
-    // Type-based pipeline cards
+    // Pipeline cards (NL + US only, no VL)
+    const nlWt = nlDeals.reduce((s, d) => s + (d.nl || 0) * (d.prob || 0), 0);
+    const usWt = usDeals.reduce((s, d) => s + (d.us || 0) * (d.prob || 0), 0);
+    const vlWt = vlDeals.reduce((s, d) => s + (d.vl || 0) * (d.prob || 0), 0);
+
     $('#pipeCards').innerHTML = [
-      { label: 'OPEN PIPELINE', v: allTotal, wv: allWt, n: scoped.length, col: 'var(--ink)' },
-      { label: 'NEW LOGO',      v: nlTotal,  wv: nlWt,  n: nlDeals.length, col: 'var(--newlogo)' },
-      { label: 'UPSELL',        v: usTotal,  wv: usWt,  n: usDeals.length, col: 'var(--upsell)' },
-      { label: 'RENEWALS DUE',  v: vlTotal,  wv: vlWt,  n: vlDeals.length, col: 'var(--renewal)' },
+      { label: 'OPEN PIPELINE', v: pipeTotal, wv: nlWt + usWt, n: scoped.length, col: 'var(--ink)' },
+      { label: 'NEW LOGO',      v: nlTotal,  wv: nlWt, n: nlDeals.length, col: 'var(--newlogo)' },
+      { label: 'UPSELL',        v: usTotal,  wv: usWt, n: usDeals.length, col: 'var(--upsell)' },
+      { label: 'RENEWALS DUE',  v: vlTotal,  wv: vlWt, n: vlDeals.length, col: 'var(--renewal)' },
     ].map(({ label, v, wv, n, col }) => `<div class="panel pq">
       <div class="ptitle" style="color:${col}">${label}</div>
       <div class="big">${fmtMoney(v)}</div>
       <div class="submeta">${n} deals · ${fmtMoney(wv)} weighted</div>
     </div>`).join('');
 
-    // Open deals — two-column grid
-    const topEl = $('#pipeTop');
-    if (topEl) {
-      const sorted = scoped.slice().sort((a, b) => (b.nl + b.us + b.vl) - (a.nl + a.us + a.vl));
-      const maxV = sorted.length ? sorted[0].nl + sorted[0].us + sorted[0].vl : 1;
+    // Helper: days until close / total days in quarter
+    const pctClose = (dStr) => {
+      const daysUntil = Math.max(0, (new Date(dStr) - today) / 86400000);
+      const daysInQtr = 90;
+      const pct = Math.min(100, Math.max(0, (1 - daysUntil / daysInQtr) * 100));
+      return Math.round(pct);
+    };
+
+    // New Logo column
+    const nlSorted = nlDeals.slice().sort((a, b) => b.nl - a.nl);
+    const nlMax = nlSorted.length ? nlSorted[0].nl : 1;
+    const nlEl = $('#pipeTop');
+    if (nlEl) {
       const sub = $('#pipeOpenSub'), tot = $('#pipeTopTot');
-      if (sub) sub.textContent = sorted.length + ' in ' + qLabel;
-      if (tot) tot.textContent = qLabel + ' · ' + fmtMoney(sorted.reduce((s, d) => s + d.nl + d.us + d.vl, 0));
-      topEl.innerHTML = sorted.length ? `<div class="pipe-grid">${sorted.map((d, i) => {
-        const v = d.nl + d.us + d.vl;
-        return `<div class="pgrid-item">
-          <div class="pgrid-top"><span class="rank">${i + 1}</span><span class="who">${esc(d.t || d.c)}</span>${pipePill(d.pi)}<span class="amt">${fmtMoney(v)}</span></div>
-          <div class="pgrid-sub">${esc(d.rep || '')} · close ${d.d}</div>
-          <div class="barline"><i style="width:${(v / maxV) * 100}%;background:${d.pi === "New logo's" ? 'var(--newlogo)' : d.vl > 0 ? 'var(--renewal)' : 'var(--upsell)'}"></i></div>
+      if (sub) sub.textContent = nlSorted.length + ' deals';
+      if (tot) tot.textContent = fmtMoney(nlTotal);
+      nlEl.innerHTML = nlSorted.length ? nlSorted.map((d, i) => {
+        const close = pctClose(d.d);
+        return `<div class="wrow">
+          <span class="rank">${i + 1}</span>
+          <div class="wrow-main">
+            <div class="wrow-top"><span class="who">${esc(d.t || d.c)}</span><span class="amt">${fmtMoney(d.nl)}</span></div>
+            <div class="submeta">${esc(d.rep || '')} · ${close}% close</div>
+            <div class="barline"><i style="width:${(d.nl / nlMax) * 100}%;background:var(--newlogo)"></i></div>
+          </div>
         </div>`;
-      }).join('')}</div>` : '<div class="empty">No open deals</div>';
+      }).join('') : '<div class="empty">No new logo deals</div>';
     }
 
-    // New logo funnel — group by stage (using prob as stage proxy)
-    const funnelEl = $('#funnel');
-    if (funnelEl) {
-      const nlOpen = nlDeals.slice().sort((a, b) => (b.nl + b.us) - (a.nl + a.us));
-      const totalNL = nlOpen.reduce((s, d) => s + d.nl + d.us, 0);
-      const totalWt = nlOpen.reduce((s, d) => s + wt(d), 0);
-      const fTot = $('#funnelTot');
-      if (fTot) fTot.innerHTML = `${fmtMoney(totalNL)} <span class="ofgoal">/ ${fmtMoney(totalWt)} weighted</span>`;
-
-      // Group by stage name (from sync) or fall back to prob buckets
-      const STAGES = [
-        { name: 'First contact',     prob: 0.10 },
-        { name: 'Discovery / meeting', prob: 0.20 },
-        { name: 'Follow-up / demo',  prob: 0.40 },
-        { name: 'Proposal sent',     prob: 0.50 },
-        { name: 'High probability',  prob: 0.75 },
-      ];
-      const stageBuckets = STAGES.map(s => ({ ...s, deals: [] }));
-      const otherDeals = [];
-      nlOpen.forEach(d => {
-        const p = d.prob || 0;
-        const bucket = stageBuckets.find(s => Math.abs(s.prob - p) < 0.06 || (d.stage && d.stage === s.name));
-        if (bucket) bucket.deals.push(d);
-        else otherDeals.push(d);
-      });
-      const activeStages = stageBuckets.filter(s => s.deals.length > 0);
-      if (otherDeals.length) activeStages.push({ name: 'Other', prob: null, deals: otherDeals });
-
-      let fDetail = '';
-      funnelEl.innerHTML = activeStages.length ? activeStages.map(s => {
-        const sv = s.deals.reduce((t, d) => t + d.nl + d.us, 0);
-        const sw = s.deals.reduce((t, d) => t + wt(d), 0);
-        const pct = totalNL > 0 ? sv / totalNL * 100 : 0;
-        const probLabel = s.prob != null ? `<span class="pill-prob">${Math.round(s.prob * 100)}%</span>` : '';
-        const stageId = 'fs-' + s.name.replace(/\W/g, '');
-        fDetail += `<div class="fnl-stage-detail" id="${stageId}" style="display:none">${s.deals.map(d =>
-          `<div class="row"><span class="who">${esc(d.t || d.c)}</span><span class="submeta">${esc(d.rep || '')}</span><span class="amt">${fmtMoney(d.nl + d.us)}</span></div>`
-        ).join('')}</div>`;
-        return `<div class="fnl-stage" data-detail="${stageId}">
-          <div class="fnl-head"><span class="fnl-name">${esc(s.name)}</span>${probLabel}<span class="amt">${fmtMoney(sv)}</span></div>
-          <div class="fnl-bar"><i style="width:${pct}%"></i></div>
-          <div class="fnl-meta">${s.deals.length} deal${s.deals.length !== 1 ? 's' : ''} · ${fmtMoney(sw)} weighted · <span class="fnl-toggle">click to see deals</span></div>
-        </div>`;
-      }).join('') : '<div class="empty">No new logo deals in pipeline</div>';
-
-      const fDetEl = $('#funnelDetail');
-      if (fDetEl) {
-        fDetEl.innerHTML = fDetail;
-        funnelEl.querySelectorAll('.fnl-stage').forEach(el => {
-          el.addEventListener('click', () => {
-            const det = document.getElementById(el.dataset.detail);
-            if (det) det.style.display = det.style.display === 'none' ? 'block' : 'none';
-          });
-        });
-      }
-    }
-
-    // Pipeline per person
-    const repsEl = $('#pipeReps');
-    if (repsEl) {
-      const repMap = {}, repCount = {};
-      scoped.forEach(d => {
-        if (!d.rep) return;
-        repMap[d.rep]   = (repMap[d.rep] || 0) + d.nl + d.us + d.vl;
-        repCount[d.rep] = (repCount[d.rep] || 0) + 1;
-      });
-      const rows = Object.entries(repMap).sort((a, b) => b[1] - a[1]);
-      const maxR = rows.length ? rows[0][1] : 1;
+    // Upsell column
+    const usSorted = usDeals.slice().sort((a, b) => b.us - a.us);
+    const usMax = usSorted.length ? usSorted[0].us : 1;
+    const usEl = $('#pipeReps');
+    if (usEl) {
       const tot = $('#pipeRepsTot');
-      if (tot) tot.textContent = fmtMoney(rows.reduce((s, r) => s + r[1], 0));
-      repsEl.innerHTML = rows.length ? rows.map(([nm, v], i) =>
-        `<div class="row"><span class="rank">${i + 1}</span><span class="who">${esc(nm)}</span><span class="submeta">${repCount[nm]} deal${repCount[nm] !== 1 ? 's' : ''}</span><span class="amt">${fmtMoney(v)}</span><span class="barline"><i style="width:${(v / maxR) * 100}%"></i></span></div>`).join('')
-        : '<div class="empty">No open deals</div>';
+      if (tot) tot.textContent = fmtMoney(usTotal);
+      usEl.innerHTML = usSorted.length ? usSorted.map((d, i) => {
+        const close = pctClose(d.d);
+        return `<div class="wrow">
+          <span class="rank">${i + 1}</span>
+          <div class="wrow-main">
+            <div class="wrow-top"><span class="who">${esc(d.t || d.c)}</span><span class="amt">${fmtMoney(d.us)}</span></div>
+            <div class="submeta">${esc(d.rep || '')} · ${close}% close</div>
+            <div class="barline"><i style="width:${(d.us / usMax) * 100}%;background:var(--upsell)"></i></div>
+          </div>
+        </div>`;
+      }).join('') : '<div class="empty">No upsell deals</div>';
     }
 
-    // Upcoming renewals
+    // Renewals column
+    const vlSorted = vlDeals.slice().sort((a, b) => b.vl - a.vl);
+    const vlMax = vlSorted.length ? vlSorted[0].vl : 1;
     const renewEl = $('#renewalList');
     if (renewEl) {
-      const renewals = allOpen.filter(d => d.vl > 0).sort((a, b) => a.d.localeCompare(b.d));
       const sub = $('#renewalSub'), tot = $('#renewalTot');
-      if (sub) sub.textContent = renewals.length + ' in ' + qLabel;
-      const vlTotalAll = renewals.reduce((s, d) => s + d.vl, 0);
-      const vlWtAll    = renewals.reduce((s, d) => s + d.vl * (d.prob || 0), 0);
-      if (tot) tot.innerHTML = `${fmtMoney(vlTotalAll)} <span class="ofgoal">/ ${fmtMoney(vlWtAll)} weighted</span>`;
-      const maxR2 = renewals.length ? renewals[0].vl : 1;
-      renewEl.innerHTML = renewals.length ? renewals.slice(0, 30).map((d, i) =>
-        `<div class="row"><span class="rank">${i + 1}</span><span class="who">${esc(d.t || d.c)}</span><span class="submeta">${qLabel} · ${esc(d.rep || '')}</span><span class="amt">${fmtMoney(d.vl)}</span><span class="barline"><i style="width:${(d.vl / maxR2) * 100}%;background:var(--renewal)"></i></span></div>`
-      ).join('') : '<div class="empty">No upcoming renewals</div>';
+      if (sub) sub.textContent = vlSorted.length + ' deals';
+      if (tot) tot.textContent = fmtMoney(vlTotal);
+      renewEl.innerHTML = vlSorted.length ? vlSorted.map((d, i) => {
+        const close = pctClose(d.d);
+        return `<div class="wrow">
+          <span class="rank">${i + 1}</span>
+          <div class="wrow-main">
+            <div class="wrow-top"><span class="who">${esc(d.t || d.c)}</span><span class="amt">${fmtMoney(d.vl)}</span></div>
+            <div class="submeta">${esc(d.rep || '')} · ${close}% close</div>
+            <div class="barline"><i style="width:${(d.vl / vlMax) * 100}%;background:var(--renewal)"></i></div>
+          </div>
+        </div>`;
+      }).join('') : '<div class="empty">No renewals</div>';
     }
 
-    // Remove old Q-by-Q table
-    const tw = $('#pipeTableWrap'); if (tw) tw.innerHTML = '';
+    // Remove old sections
+    $$('#funnel, #funnelDetail, #pipeTableWrap').forEach(el => { if (el) el.innerHTML = ''; });
   }
 
   async function renderChurn(y) {
@@ -782,8 +737,8 @@
       root.style.setProperty('--ink', '#1a1a1a');
       root.style.setProperty('--ink-dim', '#505050');
       root.style.setProperty('--ink-faint', '#888');
-      root.style.setProperty('--line', '#e5e5e5');
-      root.style.setProperty('--line-strong', '#d0d0d0');
+      root.style.setProperty('--line', '#c0c0c0');
+      root.style.setProperty('--line-strong', '#909090');
     } else {
       root.style.setProperty('--bg', '#0f1419');
       root.style.setProperty('--bg-2', '#1a202c');
@@ -797,16 +752,49 @@
     }
   }
 
+  async function exportFinance() {
+    const y = state.year;
+    const deals = wonDealsForYear(y).filter(d => !d.status || d.status === 'won');
+
+    // Create CSV for bookings
+    let bookingsCSV = 'Title\tCustomer Name\tDate Closed\tItem Name\tAmount (Euros)\tSales Rep\tIndustry\tBookings Type\tCountry\tPipeline\n';
+    deals.forEach(d => {
+      const items = [
+        { name: 'NL ARR', val: d.nl_arr },
+        { name: 'NL OO', val: d.nl_oo },
+        { name: 'NL OB', val: d.nl_ob },
+        { name: 'US ARR', val: d.us_arr },
+        { name: 'US OO', val: d.us_oo },
+        { name: 'US OB', val: d.us_ob },
+        { name: 'VL REC', val: d.vl_rec },
+        { name: 'VL OO', val: d.vl_oo },
+        { name: 'VL IMPL', val: d.vl_impl },
+      ].filter(i => i.val > 0);
+
+      items.forEach(item => {
+        bookingsCSV += `${esc(d.t)}\t${esc(d.c)}\t${d.d}\t${item.name}\t${item.val}\t${esc(d.rep || '')}\t${esc(d.ct || '')}\t${esc(d.ty || '')}\t${esc(d.co || '')}\t${esc(d.pi || '')}\n`;
+      });
+    });
+
+    // Download
+    const blob = new Blob([bookingsCSV], { type: 'text/tab-separated-values' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `safesight-bookings-${y}.tsv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast(`Exported ${deals.length} bookings for ${y}`);
+  }
+
   function bind() {
     $$('.tabbtn').forEach(b => b.addEventListener('click', () => { state.tab = b.dataset.tab; render(); }));
     $('#yearSel').addEventListener('change', e => { state.year = +e.target.value; render(); });
     $('#cmpSel').addEventListener('change', e => { state.compare = e.target.value; render(); });
     $('#repSel').addEventListener('change', e => { state.rep = e.target.value; render(); });
-    $('#coSel').addEventListener('change', e => { state.country = e.target.value; render(); });
     $$('#granSeg button').forEach(b => b.addEventListener('click', () => { state.gran = b.dataset.g; render(); }));
     $$('#qSeg button').forEach(b => b.addEventListener('click', () => { state.quarter = b.dataset.q === 'all' ? 'all' : +b.dataset.q; render(); }));
     $$('#currencySeg button').forEach(b => b.addEventListener('click', () => { state.currency = b.dataset.cur; render(); }));
-    $('#vlToggle').addEventListener('click', () => { state.includeVL = !state.includeVL; render(); });
     $('#themeToggle').addEventListener('click', () => { state.theme = state.theme === 'dark' ? 'light' : 'dark'; persist(); applyTheme(); });
 
     $('#goalLink').addEventListener('click', openGoals);
@@ -818,7 +806,7 @@
     const fi = $('#fileInput');
     $('#uploadBtn').addEventListener('click', () => fi.click());
     fi.addEventListener('change', e => { if (e.target.files[0]) loadFile(e.target.files[0]); });
-    $('#resetBtn').addEventListener('click', () => { DATA = window.SAFESIGHT_DEFAULT; render(); toast('Reverted to synced data'); });
+    $('#finExportBtn').addEventListener('click', exportFinance);
 
     const drop = $('#drop'); let dc = 0;
     window.addEventListener('dragenter', e => { e.preventDefault(); dc++; drop.classList.add('show'); });

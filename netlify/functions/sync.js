@@ -190,41 +190,32 @@ exports.handler = async () => {
     const deals = allDeals.map(d => {
       const customer  = getCustomer(d);
       const tyVal     = fieldValue(d, cfg.fType) || '';
-      // Type logic: if "renewal + upsell", show as upsell; if only renewal, show renewal
+      // Type logic: if "renewal + upsell", display as "Upsell" but keep separate value amounts
       const isRenewalPlus = tyVal.toLowerCase().includes('renewal') && tyVal.toLowerCase().includes('upsell');
-      const isOnlyRenewal = tyVal.toLowerCase().includes('renewal') && !tyVal.toLowerCase().includes('upsell');
 
-      let nl_arr    = Math.round(fieldNum(d, cfg.fNL_ARR));
-      let nl_oo     = Math.round(fieldNum(d, cfg.fNL_OO));
-      let nl_ob     = Math.round(fieldNum(d, cfg.fNL_OB));
-      let us_arr    = Math.round(fieldNum(d, cfg.fUS_ARR));
-      let us_oo     = Math.round(fieldNum(d, cfg.fUS_OO));
-      let us_ob     = Math.round(fieldNum(d, cfg.fUS_OB));
-      let vl_rec    = Math.round(fieldNum(d, cfg.fVL_REC));
-      let vl_oo     = Math.round(fieldNum(d, cfg.fVL_OO));
-      let vl_impl   = Math.round(fieldNum(d, cfg.fVL_IMPL));
-
-      // If "renewal + upsell", move renewal value to upsell
-      if (isRenewalPlus) {
-        us_arr += vl_rec; us_oo += vl_oo; us_ob += vl_impl;
-        vl_rec = 0; vl_oo = 0; vl_impl = 0;
-      }
+      const nl_arr    = Math.round(fieldNum(d, cfg.fNL_ARR));
+      const nl_oo     = Math.round(fieldNum(d, cfg.fNL_OO));
+      const nl_ob     = Math.round(fieldNum(d, cfg.fNL_OB));
+      const us_arr    = Math.round(fieldNum(d, cfg.fUS_ARR));
+      const us_oo     = Math.round(fieldNum(d, cfg.fUS_OO));
+      const us_ob     = Math.round(fieldNum(d, cfg.fUS_OB));
+      const vl_rec    = Math.round(fieldNum(d, cfg.fVL_REC));
+      const vl_oo     = Math.round(fieldNum(d, cfg.fVL_OO));
+      const vl_impl   = Math.round(fieldNum(d, cfg.fVL_IMPL));
 
       return {
         t:       d.title || '',
         c:       customer.name,
         d:       d._date.slice(0, 10),
-        // totals (used by dashboard)
         nl:      nl_arr + nl_oo + nl_ob,
         us:      us_arr + us_oo + us_ob,
         vl:      vl_rec + vl_oo + vl_impl,
-        // breakdown
         nl_arr, nl_oo, nl_ob,
         us_arr, us_oo, us_ob,
         vl_rec, vl_oo, vl_impl,
         rep:     userMap[d.responsible_user?.id] || '',
         ct:      fieldValue(d, cfg.fCustTy),
-        ty:      isRenewalPlus ? 'Upsell' : tyVal, // normalize "renewal + upsell" to "Upsell"
+        ty:      isRenewalPlus ? 'Upsell' : tyVal,
         co:      customer.co,
         pi:      getPipeline(d),
         stage:   d.pipeline_stage?.name || '',
