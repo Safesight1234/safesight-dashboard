@@ -134,20 +134,25 @@ exports.handler = async () => {
     const userMap   = {};
     (usersResp.data || []).forEach(u => { userMap[u.id] = `${u.first_name} ${u.last_name}`.trim(); });
 
-    // Try fetching with status filter; fall back to no filter if API rejects it
-    let rawDeals;
+    // Fetch open and won deals separately so one failing doesn't prevent the other
+    let openDeals = [], wonDeals = [];
     try {
-      const [rawOpen, rawWon] = await Promise.all([
-        tlAll('deals.list', { filter: { pipeline_ids: [cfg.p1, cfg.p2], status: ['open'] }, includes: 'custom_fields' }, token),
-        tlAll('deals.list', { filter: { pipeline_ids: [cfg.p1, cfg.p2], status: ['won']  }, includes: 'custom_fields' }, token),
-      ]);
-      rawDeals = rawOpen.map(d => ({ ...d, _detectedStatus: 'open' }))
-                .concat(rawWon.map(d => ({ ...d, _detectedStatus: 'won' })));
+      openDeals = await tlAll('deals.list', { filter: { pipeline_ids: [cfg.p1, cfg.p2], status: ['open'] }, includes: 'custom_fields' }, token);
     } catch (e) {
-      // status filter not supported — fetch all and detect via won_at
-      rawDeals = (await tlAll('deals.list', { filter: { pipeline_ids: [cfg.p1, cfg.p2] }, includes: 'custom_fields' }, token))
-        .map(d => ({ ...d, _detectedStatus: d.won_at ? 'won' : 'open' }));
+      // status filter not supported for open — fetch all without filter and detect by won_at
+      const all = await tlAll('deals.list', { filter: { pipeline_ids: [cfg.p1, cfg.p2] }, includes: 'custom_fields' }, token);
+      openDeals = all.filter(d => !d.won_at);
+      wonDeals  = all.filter(d =>  d.won_at);
     }
+    try {
+      if (!wonDeals.length) {
+        wonDeals = await tlAll('deals.list', { filter: { pipeline_ids: [cfg.p1, cfg.p2], status: ['won'] }, includes: 'custom_fields' }, token);
+      }
+    } catch (e) {
+      // won filter failed but openDeals already set — wonDeals stays as whatever was set above
+    }
+    const rawDeals = openDeals.map(d => ({ ...d, _detectedStatus: 'open' }))
+                    .concat(wonDeals.map(d => ({ ...d, _detectedStatus: 'won' })));
 
     // Determine won vs open/lost by dates (more reliable than status string)
     const allDeals = rawDeals

@@ -12,7 +12,13 @@
   // ---------- load ----------
   let DATA = null;
   try { const s = localStorage.getItem(LS.data); if (s) DATA = JSON.parse(s); } catch (e) {}
-  if (!DATA || !DATA.deals || !DATA.deals.length) DATA = window.SAFESIGHT_DEFAULT;
+  // Always prefer embedded data when it's newer than what's in localStorage
+  const emb = window.SAFESIGHT_DEFAULT;
+  if (!DATA || !DATA.deals || !DATA.deals.length ||
+      (emb && emb.generated && (!DATA.generated || emb.generated > DATA.generated))) {
+    DATA = emb;
+    try { localStorage.removeItem(LS.data); } catch (e) {}
+  }
 
   let GOALS = {};
   try { GOALS = JSON.parse(localStorage.getItem(LS.goals)) || {}; } catch (e) {}
@@ -350,16 +356,16 @@
 
   function renderWonList(y) {
     const wonEl = $('#wonList'); if (!wonEl) return;
-    let arr = dealsForYear(y);
+    let arr = wonDealsForYear(y);
     if (state.quarter !== 'all') arr = arr.filter(d => quarterOf(d.d) === +state.quarter);
-    arr = arr.slice().sort((a, b) => b.d.localeCompare(a.d)).slice(0, 20);
+    arr = arr.slice().sort((a, b) => b.d.localeCompare(a.d));
+    const max = arr.reduce((m, d) => Math.max(m, d.nl + d.us + d.vl), 1);
     const total = arr.reduce((s, d) => s + d.nl + d.us + d.vl, 0);
     const sub = $('#wonSub'), tot = $('#wonTot');
     if (sub) sub.textContent = arr.length + ' deals';
     if (tot) tot.textContent = fmtMoney(total);
-    wonEl.innerHTML = arr.length ? arr.map(d => {
+    wonEl.innerHTML = arr.length ? arr.slice(0, 30).map(d => {
       const v = d.nl + d.us + d.vl;
-      const max = arr.reduce((m, x) => Math.max(m, x.nl + x.us + x.vl), 1);
       return `<div class="row"><span class="who">${esc(d.t || d.c)}</span><span class="submeta">${d.d}</span><span class="amt">${fmtMoney(v)}</span><span class="barline"><i style="width:${(v / max) * 100}%"></i></span></div>`;
     }).join('') : '<div class="empty">No won deals in selection</div>';
   }
