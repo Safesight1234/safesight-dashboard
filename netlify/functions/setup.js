@@ -41,7 +41,11 @@ async function refreshAccessToken() {
     }, res => {
       let raw = '';
       res.on('data', c => raw += c);
-      res.on('end', () => resolve(JSON.parse(raw).access_token));
+      res.on('end', () => {
+        const json = JSON.parse(raw);
+        if (json.error || !json.access_token) reject(new Error(`Token refresh failed: ${json.error_description || json.error || raw}`));
+        else resolve(json.access_token);
+      });
     });
     req.on('error', reject);
     req.write(body);
