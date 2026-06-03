@@ -122,6 +122,10 @@
 
   // ---------- top-level render ----------
   function render() {
+    if (!DATA || !DATA.deals || !DATA.deals.length) {
+      document.body.innerHTML = '<div style="padding:60px;text-align:center;color:#fff;font-family:sans-serif"><h2>No data loaded</h2><p>Click Sync Teamleader to load data.</p></div>';
+      return;
+    }
     const ys = years();
     const currYear = new Date().getFullYear();
     if (!state.year || !ys.includes(state.year)) {
