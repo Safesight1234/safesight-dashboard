@@ -89,14 +89,18 @@ async function githubUpdateFile(repo, filePath, content, sha, message, ghToken) 
 // ─── Main handler ──────────────────────────────────────────────────────────
 exports.handler = async () => {
   const cfg = {
-    p1:      process.env.TL_PIPELINE_1,
-    p2:      process.env.TL_PIPELINE_2,
-    fNL:     process.env.TL_FIELD_NL,
-    fUS:     process.env.TL_FIELD_US,
-    fVL:     process.env.TL_FIELD_VL,
-    fType:   process.env.TL_FIELD_TYPE,
-    fCo:     process.env.TL_FIELD_COUNTRY,
-    fCustTy: process.env.TL_FIELD_CUSTTYPE,
+    p1:       process.env.TL_PIPELINE_1,
+    p2:       process.env.TL_PIPELINE_2,
+    fNL_ARR:  process.env.TL_FIELD_NL_ARR,
+    fNL_OO:   process.env.TL_FIELD_NL_ONEOFF,
+    fNL_OB:   process.env.TL_FIELD_NL_ONBOARDING,
+    fUS_ARR:  process.env.TL_FIELD_US_ARR,
+    fUS_OO:   process.env.TL_FIELD_US_ONEOFF,
+    fUS_OB:   process.env.TL_FIELD_US_ONBOARDING,
+    fVL:      process.env.TL_FIELD_VL,
+    fType:    process.env.TL_FIELD_TYPE,
+    fCo:      process.env.TL_FIELD_COUNTRY,
+    fCustTy:  process.env.TL_FIELD_CUSTTYPE,
   };
 
   const ghToken = process.env.GH_PAT;
@@ -158,8 +162,8 @@ exports.handler = async () => {
       t:   d.title || '',
       c:   getName(d),
       d:   d._date.slice(0, 10),
-      nl:  Math.round(parseFloat(fieldValue(d, cfg.fNL))     || 0),
-      us:  Math.round(parseFloat(fieldValue(d, cfg.fUS))     || 0),
+      nl:  Math.round((parseFloat(fieldValue(d, cfg.fNL_ARR)) || 0) + (parseFloat(fieldValue(d, cfg.fNL_OO)) || 0) + (parseFloat(fieldValue(d, cfg.fNL_OB)) || 0)),
+      us:  Math.round((parseFloat(fieldValue(d, cfg.fUS_ARR)) || 0) + (parseFloat(fieldValue(d, cfg.fUS_OO)) || 0) + (parseFloat(fieldValue(d, cfg.fUS_OB)) || 0)),
       vl:  Math.round(parseFloat(fieldValue(d, cfg.fVL))     || 0),
       rep: userMap[d.responsible_user?.id] || '',
       ct:  fieldValue(d, cfg.fCustTy),
