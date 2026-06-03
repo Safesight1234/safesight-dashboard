@@ -1,6 +1,5 @@
-/* SafeSight Sales Dashboard — view logic (v2)
-   Data: { generated, deals:[{t,c,d,nl,us,vl,rep,ct,ty,co,pi}] }
-   Goals: { [year]: { nl:[q1..q4], us:[q1..q4] } }  (quarterly) */
+/* SafeSight Sales Dashboard — view logic (v3)
+   Data: { generated, deals:[{t,c,d,nl,us,vl,rep,ct,ty,co,pi,status,prob}] } */
 (function () {
   "use strict";
   const $ = (s, r = document) => r.querySelector(s);
@@ -17,7 +16,6 @@
 
   let GOALS = {};
   try { GOALS = JSON.parse(localStorage.getItem(LS.goals)) || {}; } catch (e) {}
-  // seed defaults (image) where not user-set
   const SEED = window.SAFESIGHT_DEFAULT_GOALS || {};
   for (const y in SEED) if (!GOALS[y]) GOALS[y] = { nl: SEED[y].nl.slice(), us: SEED[y].us.slice() };
 
@@ -27,21 +25,24 @@
   );
 
   // ---------- helpers ----------
-  const yearOf = d => +d.slice(0, 4);
+  const yearOf  = d => +d.slice(0, 4);
   const monthOf = d => +d.slice(5, 7) - 1;
   const quarterOf = d => Math.floor(monthOf(d) / 3);
   function years() { return [...new Set(DATA.deals.map(d => yearOf(d.d)))].sort(); }
 
   function goalsFor(y) {
     if (GOALS[y]) return GOALS[y];
-    // derive: prior-year actual +20%, split by typical shape, fallback flat
-    const prevNL = DATA.deals.filter(d => yearOf(d.d) === y - 1).reduce((s, d) => s + d.nl, 0);
-    const prevUS = DATA.deals.filter(d => yearOf(d.d) === y - 1).reduce((s, d) => s + d.us, 0);
+    const prevNL = DATA.deals.filter(d => yearOf(d.d) === y - 1 && isWon(d)).reduce((s, d) => s + d.nl, 0);
+    const prevUS = DATA.deals.filter(d => yearOf(d.d) === y - 1 && isWon(d)).reduce((s, d) => s + d.us, 0);
     const nl = Math.round(prevNL * 1.2 / 4 / 1000) * 1000 || 75000;
     const us = Math.round(prevUS * 1.2 / 4 / 1000) * 1000 || 15000;
     return { nl: [nl, nl, nl, nl], us: [us, us, us, us], _derived: true };
   }
   const annual = (g, k) => g[k].reduce((a, b) => a + b, 0);
+
+  // deals without status field are treated as won (legacy data)
+  const isWon  = d => !d.status || d.status === 'won';
+  const isOpen = d => d.status === 'open';
 
   function fmtMoney(n) {
     const a = Math.abs(n);
@@ -57,11 +58,13 @@
       (state.rep === 'all' || d.rep === state.rep) &&
       (state.country === 'all' || d.co === state.country));
   }
-  function dealsForYear(y) { return applyFilters(DATA.deals.filter(d => yearOf(d.d) === y)); }
-  function asOfMonth(y) { const ms = dealsForYear(y).map(monthOfDate); return ms.length ? Math.max(...ms) : 11; }
-  function monthOfDate(d) { return monthOf(d.d); }
+  function wonDealsForYear(y)  { return applyFilters(DATA.deals.filter(d => yearOf(d.d) === y && isWon(d))); }
+  function openDealsForYear(y) { return applyFilters(DATA.deals.filter(d => yearOf(d.d) === y && isOpen(d))); }
+  // legacy alias used by scope/series
+  function dealsForYear(y) { return wonDealsForYear(y); }
 
-  // aggregate a year into month or quarter buckets
+  function asOfMonth(y) { const ms = dealsForYear(y).map(d => monthOf(d.d)); return ms.length ? Math.max(...ms) : 11; }
+
   function series(y, gran) {
     const n = gran === 'month' ? 12 : 4;
     const arr = Array.from({ length: n }, () => ({ nl: 0, us: 0, vl: 0, count: 0 }));
@@ -72,7 +75,6 @@
     return arr;
   }
 
-  // scope = focused quarter, or full-year YTD
   function scope(y) {
     const g = goalsFor(y);
     if (state.quarter !== 'all') {
@@ -104,7 +106,8 @@
     $('#tab-overview').classList.toggle('hidden', state.tab !== 'overview');
     $('#tab-pipeline').classList.toggle('hidden', state.tab !== 'pipeline');
     $$('.tabbtn').forEach(b => b.classList.toggle('active', b.dataset.tab === state.tab));
-    if (state.tab === 'overview') renderOverview(); else renderPipeline();
+    if (state.tab === 'overview') renderOverview();
+    else if (state.tab === 'pipeline') renderPipeline();
     $('#updated').innerHTML = 'Data as of <b>' + (DATA.generated || '—') + '</b>';
   }
 
@@ -119,7 +122,6 @@
     $('#repSel').innerHTML = reps.map(r => `<option value="${r}" ${r === state.rep ? 'selected' : ''}>${r === 'all' ? 'All reps' : r}</option>`).join('');
     const cos = ['all', ...[...new Set(DATA.deals.map(d => d.co).filter(Boolean))].sort()];
     $('#coSel').innerHTML = cos.map(c => `<option value="${c}" ${c === state.country ? 'selected' : ''}>${c === 'all' ? 'All countries' : c}</option>`).join('');
-    // gran control disabled when quarter focused (handled in chart)
   }
 
   function progressBlock(actual, goal) {
@@ -140,7 +142,6 @@
     const cmp = state.compare !== 'none' ? +state.compare : null;
     const scC = cmp ? scopeFor(cmp, sc) : null;
 
-    // hero
     const sales = sc.nl + sc.us;
     const pr = progressBlock(sales, sc.gComb);
     $('#kpiSales').textContent = fmtMoney(sales);
@@ -153,12 +154,20 @@
     $('#dealCount').textContent = sc.n + ' deals won';
     $('#kpiSalesMeta').innerHTML = cmp ? deltaHTML(sales, scC.nl + scC.us, cmp) : '';
 
-    // new logo & upsell with their own goal progress
     fillKPI('NL', sc.nl, sc.gNL, cmp ? scC.nl : null, cmp);
     fillKPI('US', sc.us, sc.gUS, cmp ? scC.us : null, cmp);
-    // renewal (no goal)
     $('#kpiVL').textContent = fmtMoney(sc.vl);
     $('#kpiVLMeta').innerHTML = cmp ? deltaHTML(sc.vl, scC.vl, cmp) : '<span class="submeta">no goal set</span>';
+
+    // count badges
+    const arr = wonDealsForYear(y).filter(d => state.quarter === 'all' || quarterOf(d.d) === +state.quarter);
+    const nlEl = $('#kpiNLCount'), usEl = $('#kpiUSCount');
+    if (nlEl) nlEl.textContent = arr.filter(d => d.nl > 0).length || '';
+    if (usEl) usEl.textContent = arr.filter(d => d.us > 0).length || '';
+
+    // churn KPI — placeholder (no churn data from TL)
+    const chEl = $('#kpiChurn'); if (chEl) chEl.textContent = '—';
+    const chMeta = $('#kpiChurnMeta'); if (chMeta) chMeta.textContent = 'no churn data';
 
     renderMainChart(y, cmp);
     renderStreamChart('nl', '#nlChart', '#nlTotal');
@@ -166,9 +175,10 @@
     renderBreakdown(sc);
     renderLeaderboard(y);
     renderTable(y);
+    renderWonList(y);
   }
+
   function scopeFor(yr, like) {
-    const g = goalsFor(yr);
     if (like.isQ) {
       const arr = dealsForYear(yr).filter(d => quarterOf(d.d) === like.q);
       return { nl: sum(arr, 'nl'), us: sum(arr, 'us'), vl: sum(arr, 'vl'), n: arr.length };
@@ -176,6 +186,7 @@
     const arr = dealsForYear(yr).filter(d => monthOf(d.d) <= like.asOf);
     return { nl: sum(arr, 'nl'), us: sum(arr, 'us'), vl: sum(arr, 'vl'), n: arr.length };
   }
+
   function fillKPI(id, actual, goal, prev, cmp) {
     $('#kpi' + id).textContent = fmtMoney(actual);
     const pct = goal > 0 ? (actual / goal) * 100 : 0;
@@ -184,9 +195,8 @@
       `<span class="goalpct">${pct.toFixed(0)}% of ${fmtMoney(goal)}</span>` + (cmp ? ' ' + deltaHTML(actual, prev, cmp) : '');
   }
 
-  // visible buckets for the chart, honoring quarter focus
   function visibleIndices() {
-    if (state.quarter === 'all') return null; // all
+    if (state.quarter === 'all') return null;
     const q = +state.quarter;
     return state.gran === 'month' ? [q * 3, q * 3 + 1, q * 3 + 2] : [q];
   }
@@ -211,7 +221,6 @@
       const d = data[i];
       const total = d.nl + d.us + (state.includeVL ? d.vl : 0);
       const goal = perGoal(i);
-      const goalTop = (1 - goal / max) * (H - 22);
       let inner;
       if (cmp) {
         const ctot = cmpData[i].nl + cmpData[i].us + (state.includeVL ? cmpData[i].vl : 0);
@@ -242,7 +251,6 @@
     $('#goalLegend').classList.remove('hidden');
   }
 
-  // New logo / Upsell only mini chart with goal ticks + total
   function renderStreamChart(key, sel, totalSel) {
     const y = state.year, gran = state.gran;
     const data = series(y, gran);
@@ -296,6 +304,7 @@
       `<div class="row"><span class="rank">${i + 1}</span><span class="who">${esc(nm)}</span><span class="amt">${fmtMoney(v)}</span><span class="barline"><i style="width:${(v / max) * 100}%"></i></span></div>`).join('')
       : '<div class="empty">No reps in selection</div>';
   }
+
   function typePill(d) {
     const ty = (d.ty || '').toLowerCase();
     if (ty.includes('new logo')) return '<span class="pill nl">New logo</span>';
@@ -304,6 +313,7 @@
     if (ty.includes('renewal')) return '<span class="pill mix">Renewal+</span>';
     return `<span class="pill mix">${esc(d.ty) || '—'}</span>`;
   }
+
   function renderTable(y) {
     let arr = dealsForYear(y);
     if (state.quarter !== 'all') arr = arr.filter(d => quarterOf(d.d) === +state.quarter);
@@ -314,15 +324,42 @@
     }).join('') : '<tr><td colspan="6" class="empty">No deals in selection</td></tr>';
   }
 
+  function renderWonList(y) {
+    const wonEl = $('#wonList'); if (!wonEl) return;
+    let arr = dealsForYear(y);
+    if (state.quarter !== 'all') arr = arr.filter(d => quarterOf(d.d) === +state.quarter);
+    arr = arr.slice().sort((a, b) => b.d.localeCompare(a.d)).slice(0, 20);
+    const total = arr.reduce((s, d) => s + d.nl + d.us + d.vl, 0);
+    const sub = $('#wonSub'), tot = $('#wonTot');
+    if (sub) sub.textContent = arr.length + ' deals';
+    if (tot) tot.textContent = fmtMoney(total);
+    wonEl.innerHTML = arr.length ? arr.map(d => {
+      const v = d.nl + d.us + d.vl;
+      const max = arr.reduce((m, x) => Math.max(m, x.nl + x.us + x.vl), 1);
+      return `<div class="row"><span class="who">${esc(d.t || d.c)}</span><span class="submeta">${d.d}</span><span class="amt">${fmtMoney(v)}</span><span class="barline"><i style="width:${(v / max) * 100}%"></i></span></div>`;
+    }).join('') : '<div class="empty">No won deals in selection</div>';
+  }
+
   // ---------- PIPELINE TAB ----------
   function renderPipeline() {
     const y = state.year;
-    const arr = dealsForYear(y);
-    // per quarter, per pipeline category, value (full deal value nl+us+vl)
-    const q = Array.from({ length: 4 }, () => { const o = { total: 0, n: 0 }; PIPES.forEach(p => o[p] = 0); return o; });
-    arr.forEach(d => { const i = quarterOf(d.d); const v = d.nl + d.us + d.vl; q[i][d.pi] = (q[i][d.pi] || 0) + v; q[i].total += v; q[i].n++; });
+    const open = openDealsForYear(y);
 
-    // quarter cards
+    // filter by quarter/month if focused
+    const scoped = state.quarter === 'all'
+      ? open
+      : open.filter(d => quarterOf(d.d) === +state.quarter);
+
+    // quarter cards (open pipeline value by quarter)
+    const q = Array.from({ length: 4 }, () => { const o = { total: 0, n: 0 }; PIPES.forEach(p => o[p] = 0); return o; });
+    open.forEach(d => {
+      const i = quarterOf(d.d);
+      const v = d.nl + d.us + d.vl;
+      q[i][d.pi] = (q[i][d.pi] || 0) + v;
+      q[i].total += v;
+      q[i].n++;
+    });
+
     $('#pipeCards').innerHTML = QS.map((ql, i) => {
       const c = q[i]; const nlp = c["New logo's"] || 0, cgp = c["Customer Growth"] || 0;
       const t = c.total || 1;
@@ -335,37 +372,77 @@
       </div>`;
     }).join('');
 
-    // stacked bar chart per quarter
-    const max = Math.max(1, ...q.map(c => c.total)) * 1.1;
-    const H = 280;
-    $('#pipeChart').innerHTML = `<div class="bars" style="height:${H}px">` + QS.map((ql, i) => {
-      const c = q[i]; const nlp = c["New logo's"] || 0, cgp = c["Customer Growth"] || 0; const t = nlp + cgp;
-      const inner = t > 0 ? `<div class="bar-seg nl" style="height:${nlp / t * 100}%"></div><div class="bar-seg us" style="height:${cgp / t * 100}%"></div>` : '';
-      return `<div class="bar-col"><div class="vlab">${fmtMoney(c.total)}</div>
-        <div class="bar-stack" style="height:${Math.max((t / max) * (H - 22), t > 0 ? 3 : 0)}px">${inner}</div>
-        <div class="xlab">${ql}</div></div>`;
-    }).join('') + `</div>`;
+    // open deals list
+    const topEl = $('#pipeTop');
+    if (topEl) {
+      const sorted = scoped.slice().sort((a, b) => (b.nl + b.us + b.vl) - (a.nl + a.us + a.vl));
+      const maxV = sorted.length ? sorted[0].nl + sorted[0].us + sorted[0].vl : 1;
+      const sub = $('#pipeOpenSub'), tot = $('#pipeTopTot');
+      if (sub) sub.textContent = sorted.length + ' deals';
+      if (tot) tot.textContent = fmtMoney(sorted.reduce((s, d) => s + d.nl + d.us + d.vl, 0));
+      topEl.innerHTML = sorted.length ? sorted.slice(0, 20).map(d => {
+        const v = d.nl + d.us + d.vl;
+        const prob = d.prob != null ? ` · ${Math.round(d.prob)}%` : '';
+        return `<div class="row"><span class="who">${esc(d.t || d.c)}</span><span class="submeta">${esc(d.rep || '')}${prob}</span><span class="amt">${fmtMoney(v)}</span><span class="barline"><i style="width:${(v / maxV) * 100}%"></i></span></div>`;
+      }).join('') : '<div class="empty">No open deals</div>';
+    }
 
-    // totals row
-    const tot = q.reduce((a, c) => { a.nl += (c["New logo's"] || 0); a.cg += (c["Customer Growth"] || 0); a.n += c.n; return a; }, { nl: 0, cg: 0, n: 0 });
-    $('#pipeTotals').innerHTML =
-      `<div class="ptot"><span class="dot" style="background:var(--newlogo)"></span>New logo's pipeline<b>${fmtMoney(tot.nl)}</b></div>
-       <div class="ptot"><span class="dot" style="background:var(--upsell)"></span>Customer Growth pipeline<b>${fmtMoney(tot.cg)}</b></div>
-       <div class="ptot"><span class="dot" style="background:var(--renewal)"></span>Total ${y}<b>${fmtMoney(tot.nl + tot.cg)}</b></div>`;
+    // pipeline per person
+    const repsEl = $('#pipeReps');
+    if (repsEl) {
+      const map = {};
+      scoped.forEach(d => { if (d.rep) map[d.rep] = (map[d.rep] || 0) + d.nl + d.us + d.vl; });
+      const rows = Object.entries(map).sort((a, b) => b[1] - a[1]);
+      const maxR = rows.length ? rows[0][1] : 1;
+      const tot = $('#pipeRepsTot');
+      if (tot) tot.textContent = fmtMoney(rows.reduce((s, r) => s + r[1], 0));
+      repsEl.innerHTML = rows.length ? rows.map(([nm, v], i) =>
+        `<div class="row"><span class="rank">${i + 1}</span><span class="who">${esc(nm)}</span><span class="amt">${fmtMoney(v)}</span><span class="barline"><i style="width:${(v / maxR) * 100}%"></i></span></div>`).join('')
+        : '<div class="empty">No open deals</div>';
+    }
 
-    // table: all deals grouped by quarter
-    const byq = [[], [], [], []]; arr.forEach(d => byq[quarterOf(d.d)].push(d));
+    // funnel — group by pipeline
+    const funnelEl = $('#funnel');
+    if (funnelEl) {
+      const nlDeals = scoped.filter(d => d.pi === "New logo's");
+      const nlTotal = nlDeals.reduce((s, d) => s + d.nl + d.us + d.vl, 0);
+      const fTot = $('#funnelTot'), fDet = $('#funnelDetail');
+      if (fTot) fTot.textContent = fmtMoney(nlTotal);
+      funnelEl.innerHTML = nlDeals.length
+        ? `<div class="lb">` + nlDeals.slice().sort((a, b) => (b.nl + b.us + b.vl) - (a.nl + a.us + a.vl)).slice(0, 10).map(d => {
+            const v = d.nl + d.us + d.vl;
+            return `<div class="row"><span class="who">${esc(d.t || d.c)}</span><span class="submeta">${d.d}</span><span class="amt">${fmtMoney(v)}</span></div>`;
+          }).join('') + `</div>`
+        : '<div class="empty">No new logo deals in pipeline</div>';
+      if (fDet) fDet.innerHTML = '';
+    }
+
+    // upcoming renewals — open deals with vl > 0
+    const renewEl = $('#renewalList');
+    if (renewEl) {
+      const renewals = open.filter(d => d.vl > 0).sort((a, b) => a.d.localeCompare(b.d));
+      const sub = $('#renewalSub'), tot = $('#renewalTot');
+      if (sub) sub.textContent = renewals.length + ' deals';
+      if (tot) tot.textContent = fmtMoney(renewals.reduce((s, d) => s + d.vl, 0));
+      renewEl.innerHTML = renewals.length ? renewals.slice(0, 20).map(d =>
+        `<div class="row"><span class="who">${esc(d.t || d.c)}</span><span class="submeta">${d.d} · ${esc(d.rep || '')}</span><span class="amt">${fmtMoney(d.vl)}</span></div>`
+      ).join('') : '<div class="empty">No upcoming renewals</div>';
+    }
+
+    // deal table grouped by quarter
+    const byq = [[], [], [], []]; open.forEach(d => byq[quarterOf(d.d)].push(d));
     $('#pipeTableWrap').innerHTML = QS.map((ql, i) => {
       const rows = byq[i].sort((a, b) => (b.nl + b.us + b.vl) - (a.nl + a.us + a.vl));
-      if (!rows.length) return `<div class="qgroup"><h3>${ql} ${y}</h3><div class="empty">No deals</div></div>`;
+      if (!rows.length) return `<div class="qgroup"><h3>${ql} ${y}</h3><div class="empty">No open deals</div></div>`;
       return `<div class="qgroup"><h3>${ql} ${y} · ${rows.length} deals · ${fmtMoney(rows.reduce((s, d) => s + d.nl + d.us + d.vl, 0))}</h3>
-        <table class="deals"><thead><tr><th>Deal</th><th>Customer</th><th>Pipeline</th><th>Owner</th><th style="text-align:right">Value</th></tr></thead><tbody>` +
-        rows.map(d => `<tr><td class="name">${esc(d.t || d.c)}</td><td>${esc(d.c)}</td><td>${pipePill(d.pi)}</td><td>${esc(d.rep || '—')}</td><td class="amt">${fmtFull(d.nl + d.us + d.vl)}</td></tr>`).join('') +
+        <table class="deals"><thead><tr><th>Deal</th><th>Customer</th><th>Pipeline</th><th>Owner</th><th>Close date</th><th style="text-align:right">Value</th></tr></thead><tbody>` +
+        rows.map(d => `<tr><td class="name">${esc(d.t || d.c)}</td><td>${esc(d.c)}</td><td>${pipePill(d.pi)}</td><td>${esc(d.rep || '—')}</td><td>${d.d}</td><td class="amt">${fmtFull(d.nl + d.us + d.vl)}</td></tr>`).join('') +
         `</tbody></table></div>`;
     }).join('');
 
-    $('#pipeYear').textContent = y;
+    const py = $('#pipeYear'); if (py) py.textContent = y;
   }
+
   function pipePill(p) {
     if (p === "New logo's") return '<span class="pill nl">New logo\'s</span>';
     if (p === 'Customer Growth') return '<span class="pill us">Customer Growth</span>';
@@ -451,6 +528,7 @@
       toast(`Updated · ${parsed.deals.length} deals loaded`);
     } catch (err) { console.error(err); toast('Could not read file: ' + err.message, true); }
   }
+
   let toastT;
   function toast(msg, isErr) {
     const t = $('#toast'); t.textContent = msg; t.className = 'toast show' + (isErr ? ' err' : '');
