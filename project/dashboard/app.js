@@ -120,9 +120,12 @@
     renderControls(ys);
     $('#tab-overview').classList.toggle('hidden', state.tab !== 'overview');
     $('#tab-pipeline').classList.toggle('hidden', state.tab !== 'pipeline');
+    const finEl = $('#tab-financials');
+    if (finEl) finEl.classList.toggle('hidden', state.tab !== 'financials');
     $$('.tabbtn').forEach(b => b.classList.toggle('active', b.dataset.tab === state.tab));
     if (state.tab === 'overview') renderOverview();
     else if (state.tab === 'pipeline') renderPipeline();
+    else if (state.tab === 'financials') renderFinancials();
     $('#updated').innerHTML = 'Data as of <b>' + (DATA.generated || '—') + '</b>';
   }
 
@@ -468,6 +471,53 @@
     if (p === "New logo's") return '<span class="pill nl">New logo\'s</span>';
     if (p === 'Customer Growth') return '<span class="pill us">Customer Growth</span>';
     return `<span class="pill mix">${esc(p) || '—'}</span>`;
+  }
+
+  // ---------- FINANCIALS TAB ----------
+  async function renderFinancials() {
+    const y = state.year;
+
+    // Sales from won deals
+    const won = wonDealsForYear(y);
+    const nl  = sum(won, 'nl'), us = sum(won, 'us'), vl = sum(won, 'vl');
+    const sc  = scopeWon(y);
+    const pr  = sc.gComb > 0 ? (nl + us) / sc.gComb * 100 : 0;
+
+    const set = (id, v) => { const el = $(id); if (el) el.textContent = v; };
+    set('#finYear',  y);
+    set('#finSales', fmtFull(nl + us));
+    set('#finNL',    fmtFull(nl));
+    set('#finUS',    fmtFull(us));
+    set('#finVL',    fmtFull(vl));
+    set('#finDeals', won.length + ' deals won');
+    set('#finNLMeta', Math.round(nl / (sc.gNL || 1) * 100) + '% of ' + fmtMoney(sc.gNL) + ' goal');
+    set('#finUSMeta', Math.round(us / (sc.gUS || 1) * 100) + '% of ' + fmtMoney(sc.gUS) + ' goal');
+
+    const pf = $('#finPfill'); if (pf) pf.style.width = Math.min(100, pr) + '%';
+    set('#finPct',      Math.round(pr) + '%');
+    set('#finGoalNote', 'of ' + fmtMoney(sc.gComb) + ' goal');
+
+    // Fetch ARR + Churn from Google Sheets via proxy
+    set('#finARR',        '…');
+    set('#finTotal75',    '…');
+    set('#finChurnTotal', '…');
+
+    try {
+      const r = await fetch(`/.netlify/functions/finance-data?year=${y}`);
+      const d = await r.json();
+      if (d.error) throw new Error(d.error);
+
+      set('#finARR',        fmtFull(d.arrTotal));
+      set('#finTotal75',    fmtFull(d.total75));
+      set('#finChurnTotal', fmtMoney(d.churnTotal));
+      const churnMeta = $('#finChurnTotalMeta');
+      if (churnMeta) churnMeta.textContent = d.churnCount + ' customers · ' + y + ' lost ARR';
+      const asOf = $('#finAsOf'); if (asOf) asOf.textContent = '';
+    } catch (e) {
+      set('#finARR', 'unavailable');
+      set('#finTotal75', 'unavailable');
+      set('#finChurnTotal', 'unavailable');
+    }
   }
 
   // ---------- goals modal ----------
