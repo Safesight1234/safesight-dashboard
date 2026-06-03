@@ -135,15 +135,11 @@ exports.handler = async () => {
     (usersResp.data || []).forEach(u => { userMap[u.id] = `${u.first_name} ${u.last_name}`.trim(); });
 
     // Fetch won + open deals from both pipelines
-    const [wonDeals, openDeals] = await Promise.all([
-      tlAll('deals.list', { filter: { pipeline_ids: [cfg.p1, cfg.p2], status: ['won']  }, includes: 'custom_fields' }, token),
-      tlAll('deals.list', { filter: { pipeline_ids: [cfg.p1, cfg.p2], status: ['open'] }, includes: 'custom_fields' }, token),
-    ]);
+    const rawDeals = await tlAll('deals.list', { filter: { pipeline_ids: [cfg.p1, cfg.p2] }, includes: 'custom_fields' }, token);
 
-    const allDeals = [
-      ...wonDeals.map(d  => ({ ...d, _date: d.won_at })),
-      ...openDeals.map(d => ({ ...d, _date: d.estimated_closing_date })),
-    ].filter(d => d._date);
+    const allDeals = rawDeals
+      .map(d => ({ ...d, _date: d.status === 'won' ? d.won_at : d.estimated_closing_date }))
+      .filter(d => (d.status === 'won' || d.status === 'open') && d._date);
 
     // Resolve company/contact names + country
     const companyIds = [...new Set(allDeals.filter(d => d.lead?.customer?.type === 'company').map(d => d.lead.customer.id))];
