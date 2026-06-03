@@ -1,7 +1,6 @@
 exports.handler = async () => {
   const clientId   = process.env.TL_CLIENT_ID;
-  const siteUrl    = process.env.URL; // Netlify sets this automatically
-  const redirectUri = `${siteUrl}/.netlify/functions/auth-callback`;
+  const redirectUri = 'https://safesightnumbers.netlify.app/.netlify/functions/auth-callback';
 
   if (!clientId) {
     return { statusCode: 500, body: 'TL_CLIENT_ID is not set in Netlify environment variables.' };

@@ -31,8 +31,7 @@ const page = (title, color, body) => `<!DOCTYPE html>
 
 exports.handler = async (event) => {
   const { code, error } = event.queryStringParameters || {};
-  const siteUrl     = process.env.URL;
-  const redirectUri = `${siteUrl}/.netlify/functions/auth-callback`;
+  const redirectUri = 'https://safesightnumbers.netlify.app/.netlify/functions/auth-callback';
 
   if (error) return { statusCode: 400, headers: { 'Content-Type': 'text/html' },
     body: page('Error', '#f87171', `<h1>Connection failed</h1><p>${error}</p>`) };
