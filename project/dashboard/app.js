@@ -34,7 +34,10 @@
   const yearOf  = d => +d.slice(0, 4);
   const monthOf = d => +d.slice(5, 7) - 1;
   const quarterOf = d => Math.floor(monthOf(d) / 3);
-  function years() { return [...new Set(DATA.deals.map(d => yearOf(d.d)))].sort(); }
+  function years() {
+    const currYear = new Date().getFullYear();
+    return [...new Set(DATA.deals.map(d => yearOf(d.d)))].sort().filter(y => y <= currYear + 1);
+  }
 
   function goalsFor(y) {
     if (GOALS[y]) return GOALS[y];
@@ -120,7 +123,10 @@
   // ---------- top-level render ----------
   function render() {
     const ys = years();
-    if (!state.year || !ys.includes(state.year)) state.year = ys[ys.length - 1];
+    const currYear = new Date().getFullYear();
+    if (!state.year || !ys.includes(state.year)) {
+      state.year = ys.filter(y => y <= currYear).pop() || ys[ys.length - 1];
+    }
     if (state.compare !== 'none' && (!ys.includes(+state.compare) || +state.compare === state.year)) state.compare = 'none';
     persist();
     renderControls(ys);
