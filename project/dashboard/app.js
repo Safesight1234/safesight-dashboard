@@ -61,8 +61,7 @@
   }
   function wonDealsForYear(y)  { return applyFilters(DATA.deals.filter(d => yearOf(d.d) === y && isWon(d))); }
   function openDealsForYear(y) { return applyFilters(DATA.deals.filter(d => yearOf(d.d) === y && isOpen(d))); }
-  // legacy alias used by scope/series
-  function dealsForYear(y) { return wonDealsForYear(y); }
+  function dealsForYear(y)     { return applyFilters(DATA.deals.filter(d => yearOf(d.d) === y)); }
 
   function asOfMonth(y) { const ms = dealsForYear(y).map(d => monthOf(d.d)); return ms.length ? Math.max(...ms) : 11; }
 
@@ -96,6 +95,21 @@
     };
   }
   function sum(arr, k) { return arr.reduce((s, d) => s + d[k], 0); }
+
+  // same as scope() but won deals only — used for goal progress
+  function scopeWon(y) {
+    const g = goalsFor(y);
+    if (state.quarter !== 'all') {
+      const q = +state.quarter;
+      const arr = wonDealsForYear(y).filter(d => quarterOf(d.d) === q);
+      return { nl: sum(arr, 'nl'), us: sum(arr, 'us'), vl: sum(arr, 'vl'), n: arr.length,
+               gNL: g.nl[q], gUS: g.us[q], gComb: g.nl[q] + g.us[q] };
+    }
+    const m = asOfMonth(y);
+    const arr = wonDealsForYear(y).filter(d => monthOf(d.d) <= m);
+    return { nl: sum(arr, 'nl'), us: sum(arr, 'us'), vl: sum(arr, 'vl'), n: arr.length,
+             gNL: annual(g, 'nl'), gUS: annual(g, 'us'), gComb: annual(g, 'nl') + annual(g, 'us') };
+  }
 
   // ---------- top-level render ----------
   function render() {
@@ -143,20 +157,23 @@
     const cmp = state.compare !== 'none' ? +state.compare : null;
     const scC = cmp ? scopeFor(cmp, sc) : null;
 
+    // won-only scope for goal tracking
+    const scWon = scopeWon(y);
     const sales = sc.nl + sc.us;
-    const pr = progressBlock(sales, sc.gComb);
+    const wonSales = scWon.nl + scWon.us;
+    const pr = progressBlock(wonSales, sc.gComb);
     $('#kpiSales').textContent = fmtMoney(sales);
     $('#ytdLabel').textContent = sc.label + (sc.isQ ? '' : ' · YTD');
     $('#scopeNote').textContent = sc.isQ ? 'Quarter goal' : 'Annual goal';
     $('#pfill').style.width = Math.min(100, pr.pct) + '%';
     $('#ppct').textContent = pr.pctTxt;
     $('#goalAmt').textContent = fmtMoney(sc.gComb);
-    $('#pGoalNote').textContent = 'of ' + fmtMoney(sc.gComb) + ' goal · ' + fmtMoney(pr.remain) + ' to go';
-    $('#dealCount').textContent = sc.n + ' deals won';
-    $('#kpiSalesMeta').innerHTML = cmp ? deltaHTML(sales, scC.nl + scC.us, cmp) : '';
+    $('#pGoalNote').textContent = fmtMoney(wonSales) + ' won · ' + fmtMoney(sales - wonSales) + ' pipeline';
+    $('#dealCount').textContent = scWon.n + ' won · ' + (sc.n - scWon.n) + ' open';
+    $('#kpiSalesMeta').innerHTML = cmp ? deltaHTML(wonSales, scC.nl + scC.us, cmp) : '';
 
-    fillKPI('NL', sc.nl, sc.gNL, cmp ? scC.nl : null, cmp);
-    fillKPI('US', sc.us, sc.gUS, cmp ? scC.us : null, cmp);
+    fillKPI('NL', sc.nl, scWon.nl, scWon.gNL, cmp ? scC.nl : null, cmp);
+    fillKPI('US', sc.us, scWon.us, scWon.gUS, cmp ? scC.us : null, cmp);
     $('#kpiVL').textContent = fmtMoney(sc.vl);
     $('#kpiVLMeta').innerHTML = cmp ? deltaHTML(sc.vl, scC.vl, cmp) : '<span class="submeta">no goal set</span>';
 
@@ -188,12 +205,15 @@
     return { nl: sum(arr, 'nl'), us: sum(arr, 'us'), vl: sum(arr, 'vl'), n: arr.length };
   }
 
-  function fillKPI(id, actual, goal, prev, cmp) {
-    $('#kpi' + id).textContent = fmtMoney(actual);
-    const pct = goal > 0 ? (actual / goal) * 100 : 0;
+  function fillKPI(id, total, won, goal, prev, cmp) {
+    $('#kpi' + id).textContent = fmtMoney(total);
+    const pct = goal > 0 ? (won / goal) * 100 : 0;
     $('#p' + id + 'fill').style.width = Math.min(100, pct) + '%';
+    const pipe = total - won;
     $('#kpi' + id + 'Meta').innerHTML =
-      `<span class="goalpct">${pct.toFixed(0)}% of ${fmtMoney(goal)}</span>` + (cmp ? ' ' + deltaHTML(actual, prev, cmp) : '');
+      `<span class="goalpct">${pct.toFixed(0)}% of ${fmtMoney(goal)}</span>` +
+      (pipe > 0 ? ` <span class="submeta">+${fmtMoney(pipe)} pipeline</span>` : '') +
+      (cmp ? ' ' + deltaHTML(won, prev, cmp) : '');
   }
 
   function visibleIndices() {
