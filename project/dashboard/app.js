@@ -753,38 +753,44 @@
   }
 
   async function exportFinance() {
-    const y = state.year;
-    const deals = wonDealsForYear(y).filter(d => !d.status || d.status === 'won');
+    try {
+      const y = state.year;
+      const deals = wonDealsForYear(y).filter(d => !d.status || d.status === 'won');
 
-    // Create CSV for bookings
-    let bookingsCSV = 'Title\tCustomer Name\tDate Closed\tItem Name\tAmount (Euros)\tSales Rep\tIndustry\tBookings Type\tCountry\tPipeline\n';
-    deals.forEach(d => {
-      const items = [
-        { name: 'NL ARR', val: d.nl_arr },
-        { name: 'NL OO', val: d.nl_oo },
-        { name: 'NL OB', val: d.nl_ob },
-        { name: 'US ARR', val: d.us_arr },
-        { name: 'US OO', val: d.us_oo },
-        { name: 'US OB', val: d.us_ob },
-        { name: 'VL REC', val: d.vl_rec },
-        { name: 'VL OO', val: d.vl_oo },
-        { name: 'VL IMPL', val: d.vl_impl },
-      ].filter(i => i.val > 0);
+      if (!deals.length) { toast('No won deals to export for ' + y); return; }
 
-      items.forEach(item => {
-        bookingsCSV += `${esc(d.t)}\t${esc(d.c)}\t${d.d}\t${item.name}\t${item.val}\t${esc(d.rep || '')}\t${esc(d.ct || '')}\t${esc(d.ty || '')}\t${esc(d.co || '')}\t${esc(d.pi || '')}\n`;
+      // Create CSV for bookings
+      let bookingsCSV = 'Title\tCustomer Name\tDate Closed\tItem Name\tAmount (Euros)\tSales Rep\tIndustry\tBookings Type\tCountry\tPipeline\n';
+      deals.forEach(d => {
+        const items = [
+          { name: 'NL ARR', val: d.nl_arr },
+          { name: 'NL OO', val: d.nl_oo },
+          { name: 'NL OB', val: d.nl_ob },
+          { name: 'US ARR', val: d.us_arr },
+          { name: 'US OO', val: d.us_oo },
+          { name: 'US OB', val: d.us_ob },
+          { name: 'VL REC', val: d.vl_rec },
+          { name: 'VL OO', val: d.vl_oo },
+          { name: 'VL IMPL', val: d.vl_impl },
+        ].filter(i => i.val > 0);
+
+        items.forEach(item => {
+          bookingsCSV += `${esc(d.t)}\t${esc(d.c)}\t${d.d}\t${item.name}\t${item.val}\t${esc(d.rep || '')}\t${esc(d.ct || '')}\t${esc(d.ty || '')}\t${esc(d.co || '')}\t${esc(d.pi || '')}\n`;
+        });
       });
-    });
 
-    // Download
-    const blob = new Blob([bookingsCSV], { type: 'text/tab-separated-values' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `safesight-bookings-${y}.tsv`;
-    a.click();
-    URL.revokeObjectURL(url);
-    toast(`Exported ${deals.length} bookings for ${y}`);
+      // Download
+      const blob = new Blob([bookingsCSV], { type: 'text/tab-separated-values' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `safesight-bookings-${y}.tsv`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast(`Exported ${deals.length} bookings for ${y}`);
+    } catch (e) {
+      toast('Export failed: ' + e.message);
+    }
   }
 
   function bind() {
