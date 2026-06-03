@@ -136,8 +136,8 @@ exports.handler = async () => {
 
     // Fetch won + open deals from both pipelines
     const [wonDeals, openDeals] = await Promise.all([
-      tlAll('deals.list', { filter: { pipeline_ids: [cfg.p1, cfg.p2], status: 'won'  }, includes: 'custom_fields' }, token),
-      tlAll('deals.list', { filter: { pipeline_ids: [cfg.p1, cfg.p2], status: 'open' }, includes: 'custom_fields' }, token),
+      tlAll('deals.list', { filter: { pipeline_ids: [cfg.p1, cfg.p2], status: ['won']  }, includes: 'custom_fields' }, token),
+      tlAll('deals.list', { filter: { pipeline_ids: [cfg.p1, cfg.p2], status: ['open'] }, includes: 'custom_fields' }, token),
     ]);
 
     const allDeals = [
