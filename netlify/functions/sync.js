@@ -46,7 +46,8 @@ async function tlAll(endpoint, filterBody, token) {
   return items;
 }
 
-async function resolveNames(ids, endpoint, extract, token) {
+// Returns map of id → { name, co } for companies/contacts
+async function resolveCustomers(ids, endpoint, extract, token) {
   const map = {};
   const BATCH = 10;
   for (let i = 0; i < ids.length; i += BATCH) {
@@ -58,6 +59,13 @@ async function resolveNames(ids, endpoint, extract, token) {
     }));
   }
   return map;
+}
+
+function fieldNum(deal, fieldId) {
+  if (!fieldId) return 0;
+  const f = (deal.custom_fields || []).find(f => f.definition?.id === fieldId);
+  if (!f || f.value == null) return 0;
+  return parseFloat(f.value) || 0;
 }
 
 function fieldValue(deal, fieldId) {
@@ -75,7 +83,7 @@ async function githubGetFile(repo, filePath, ghToken) {
     null,
     { Authorization: `Bearer ${ghToken}`, 'User-Agent': 'safesight-dashboard', Accept: 'application/vnd.github+json' }
   );
-  return r.json; // { content (base64), sha }
+  return r.json;
 }
 
 async function githubUpdateFile(repo, filePath, content, sha, message, ghToken) {
@@ -97,9 +105,10 @@ exports.handler = async () => {
     fUS_ARR:  process.env.TL_FIELD_US_ARR,
     fUS_OO:   process.env.TL_FIELD_US_ONEOFF,
     fUS_OB:   process.env.TL_FIELD_US_ONBOARDING,
-    fVL:      process.env.TL_FIELD_VL,
+    fVL_REC:  process.env.TL_FIELD_VL_REC,
+    fVL_OO:   process.env.TL_FIELD_VL_ONEOFF,
+    fVL_IMPL: process.env.TL_FIELD_VL_IMPL,
     fType:    process.env.TL_FIELD_TYPE,
-    fCo:      process.env.TL_FIELD_COUNTRY,
     fCustTy:  process.env.TL_FIELD_CUSTTYPE,
   };
 
@@ -107,9 +116,8 @@ exports.handler = async () => {
   const ghRepo  = process.env.GITHUB_REPO || 'Safesight1234/safesight-dashboard';
 
   const missing = [];
-  if (!process.env.TL_REFRESH_TOKEN) missing.push('TL_REFRESH_TOKEN');
-  if (!cfg.p1 || !cfg.p2)            missing.push('TL_PIPELINE_1 / TL_PIPELINE_2');
-  if (!ghToken)                      missing.push('GH_PAT');
+  if (!cfg.p1 || !cfg.p2) missing.push('TL_PIPELINE_1 / TL_PIPELINE_2');
+  if (!ghToken)            missing.push('GH_PAT');
   if (missing.length) {
     return {
       statusCode: 400,
@@ -137,19 +145,19 @@ exports.handler = async () => {
       ...openDeals.map(d => ({ ...d, _date: d.estimated_closing_date })),
     ].filter(d => d._date);
 
-    // Resolve company/contact names
+    // Resolve company/contact names + country
     const companyIds = [...new Set(allDeals.filter(d => d.lead?.customer?.type === 'company').map(d => d.lead.customer.id))];
     const contactIds = [...new Set(allDeals.filter(d => d.lead?.customer?.type === 'contact').map(d => d.lead.customer.id))];
 
     const [companyMap, contactMap] = await Promise.all([
-      resolveNames(companyIds, 'companies', d => d.name || '', token),
-      resolveNames(contactIds, 'contacts',  d => `${d.first_name || ''} ${d.last_name || ''}`.trim(), token),
+      resolveCustomers(companyIds, 'companies', d => ({ name: d.name || '', co: d.primary_address?.country || '' }), token),
+      resolveCustomers(contactIds, 'contacts',  d => ({ name: `${d.first_name || ''} ${d.last_name || ''}`.trim(), co: d.primary_address?.country || '' }), token),
     ]);
 
-    const getName = d => {
+    const getCustomer = d => {
       const c = d.lead?.customer;
-      if (!c) return '';
-      return c.type === 'company' ? (companyMap[c.id] || '') : (contactMap[c.id] || '');
+      if (!c) return { name: '', co: '' };
+      return (c.type === 'company' ? companyMap[c.id] : contactMap[c.id]) || { name: '', co: '' };
     };
 
     const getPipeline = d => {
@@ -158,19 +166,39 @@ exports.handler = async () => {
       return '';
     };
 
-    const deals = allDeals.map(d => ({
-      t:   d.title || '',
-      c:   getName(d),
-      d:   d._date.slice(0, 10),
-      nl:  Math.round((parseFloat(fieldValue(d, cfg.fNL_ARR)) || 0) + (parseFloat(fieldValue(d, cfg.fNL_OO)) || 0) + (parseFloat(fieldValue(d, cfg.fNL_OB)) || 0)),
-      us:  Math.round((parseFloat(fieldValue(d, cfg.fUS_ARR)) || 0) + (parseFloat(fieldValue(d, cfg.fUS_OO)) || 0) + (parseFloat(fieldValue(d, cfg.fUS_OB)) || 0)),
-      vl:  Math.round(parseFloat(fieldValue(d, cfg.fVL))     || 0),
-      rep: userMap[d.responsible_user?.id] || '',
-      ct:  fieldValue(d, cfg.fCustTy),
-      ty:  fieldValue(d, cfg.fType),
-      co:  fieldValue(d, cfg.fCo),
-      pi:  getPipeline(d),
-    }));
+    const deals = allDeals.map(d => {
+      const customer  = getCustomer(d);
+      const nl_arr    = Math.round(fieldNum(d, cfg.fNL_ARR));
+      const nl_oo     = Math.round(fieldNum(d, cfg.fNL_OO));
+      const nl_ob     = Math.round(fieldNum(d, cfg.fNL_OB));
+      const us_arr    = Math.round(fieldNum(d, cfg.fUS_ARR));
+      const us_oo     = Math.round(fieldNum(d, cfg.fUS_OO));
+      const us_ob     = Math.round(fieldNum(d, cfg.fUS_OB));
+      const vl_rec    = Math.round(fieldNum(d, cfg.fVL_REC));
+      const vl_oo     = Math.round(fieldNum(d, cfg.fVL_OO));
+      const vl_impl   = Math.round(fieldNum(d, cfg.fVL_IMPL));
+
+      return {
+        t:       d.title || '',
+        c:       customer.name,
+        d:       d._date.slice(0, 10),
+        // totals (used by dashboard)
+        nl:      nl_arr + nl_oo + nl_ob,
+        us:      us_arr + us_oo + us_ob,
+        vl:      vl_rec + vl_oo + vl_impl,
+        // breakdown
+        nl_arr, nl_oo, nl_ob,
+        us_arr, us_oo, us_ob,
+        vl_rec, vl_oo, vl_impl,
+        rep:     userMap[d.responsible_user?.id] || '',
+        ct:      fieldValue(d, cfg.fCustTy),
+        ty:      fieldValue(d, cfg.fType),
+        co:      customer.co,
+        pi:      getPipeline(d),
+        status:  d.status || '',
+        prob:    d.estimated_probability ?? null,
+      };
+    });
 
     const today   = new Date().toISOString().slice(0, 10);
     const dataset = { generated: today, deals };
