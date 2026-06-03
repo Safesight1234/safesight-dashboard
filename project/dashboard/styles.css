@@ -357,3 +357,24 @@ table.deals .pill { display: inline-block; font-size: 11px; font-weight: 700; pa
 .ginp:focus { outline: none; border-color: var(--accent); }
 .goals-table td:nth-child(2), .goals-table td:nth-child(3) { text-align: right; }
 .modal-foot { display: flex; justify-content: flex-end; gap: 10px; margin-top: 22px; }
+
+
+/* ---------- Teamleader sync zone ---------- */
+.btn.ghost { background: transparent; border-color: var(--line); color: var(--ink-dim); }
+.btn.ghost:hover { color: var(--ink); border-color: var(--line-strong); background: var(--panel); }
+.hidden { display: none !important; }
+
+#tlZone { display: flex; align-items: center; gap: 8px; }
+
+.tl-status {
+  font-size: 12px; font-weight: 600; color: var(--ink-faint);
+  white-space: nowrap;
+}
+.tl-status.ok   { color: var(--good); }
+.tl-status.warn { color: var(--renewal); }
+.tl-status.err  { color: var(--bad); }
+
+@keyframes tlspin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}

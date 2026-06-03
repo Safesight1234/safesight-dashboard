@@ -27,9 +27,21 @@
     </div>
     <div class="spacer"></div>
     <div class="toolbar">
-      <button class="btn primary" id="uploadBtn">
+      <!-- Teamleader sync (only shown when running via node server.js) -->
+      <div id="tlZone" style="display:none;align-items:center;gap:8px">
+        <button class="btn tl-connect hidden" id="tlConnectBtn" title="Connect your Teamleader account">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M3 12h2m14 0h2M12 3v2m0 14v2"/></svg>
+          Connect Teamleader
+        </button>
+        <button class="btn primary tl-sync hidden" id="tlSyncBtn" title="Pull latest deals from Teamleader">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" id="tlSyncIcon"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+          Sync Teamleader
+        </button>
+        <span class="tl-status" id="tlStatus"></span>
+      </div>
+      <button class="btn ghost" id="uploadBtn">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M12 4l-5 5M12 4l5 5"></path><path d="M4 18v2h16v-2"></path></svg>
-        Update data
+        Upload xlsx
       </button>
       <input type="file" id="fileInput" accept=".xlsx" class="hidden">
     </div>
@@ -193,5 +205,88 @@
 <script src="dashboard/embedded-data.js"></script>
 <script src="dashboard/parser.js"></script>
 <script src="dashboard/app.js"></script>
+<script>
+// ── Teamleader integration (only active when served via node server.js) ──────
+(function () {
+  const zone     = document.getElementById('tlZone');
+  const connectBtn = document.getElementById('tlConnectBtn');
+  const syncBtn  = document.getElementById('tlSyncBtn');
+  const statusEl = document.getElementById('tlStatus');
+  const syncIcon = document.getElementById('tlSyncIcon');
+
+  function setStatus(msg, type) {
+    statusEl.textContent = msg;
+    statusEl.className   = 'tl-status ' + (type || '');
+  }
+
+  async function checkStatus() {
+    try {
+      const r = await fetch('/api/status');
+      if (!r.ok) return; // not running in server mode
+      const s = await r.json();
+      zone.style.display = 'flex';
+
+      if (s.connected) {
+        connectBtn.classList.add('hidden');
+        syncBtn.classList.remove('hidden');
+        if (s.last_sync) {
+          const d = new Date(s.last_sync);
+          setStatus('Last sync: ' + d.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }), 'ok');
+        }
+      } else {
+        connectBtn.classList.remove('hidden');
+        syncBtn.classList.add('hidden');
+        setStatus('Not connected', 'warn');
+      }
+    } catch {
+      // fetch failed — not running in server mode, hide TL zone
+    }
+  }
+
+  // Handle ?connected=1 or ?error=... from OAuth callback
+  const params = new URLSearchParams(location.search);
+  if (params.get('connected') === '1') {
+    history.replaceState({}, '', location.pathname);
+    window.addEventListener('DOMContentLoaded', () => {
+      checkStatus();
+      showToast('Connected to Teamleader! Click Sync to load your data.');
+    });
+  }
+  if (params.get('error')) {
+    window.addEventListener('DOMContentLoaded', () => {
+      showToast('Teamleader connection failed: ' + decodeURIComponent(params.get('error')));
+    });
+    history.replaceState({}, '', location.pathname);
+  }
+
+  connectBtn.addEventListener('click', () => {
+    location.href = '/auth/connect';
+  });
+
+  syncBtn.addEventListener('click', async () => {
+    syncBtn.disabled = true;
+    syncIcon.style.animation = 'tlspin 1s linear infinite';
+    setStatus('Syncing…', 'spin');
+
+    try {
+      const r    = await fetch('/api/sync');
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || r.statusText);
+
+      setStatus(`Synced ${data.count} deals on ${data.generated}`, 'ok');
+      showToast(`Synced ${data.count} deals from Teamleader — reloading…`);
+      setTimeout(() => location.reload(), 1500);
+    } catch (err) {
+      setStatus('Sync failed', 'err');
+      showToast('Sync error: ' + err.message);
+    } finally {
+      syncBtn.disabled = false;
+      syncIcon.style.animation = '';
+    }
+  });
+
+  checkStatus();
+})();
+</script>
 </body>
 </html>
