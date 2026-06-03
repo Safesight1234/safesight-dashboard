@@ -812,20 +812,25 @@
     $('#goalsModal').addEventListener('click', e => { if (e.target.id === 'goalsModal') $('#goalsModal').classList.remove('show'); });
 
     const fi = $('#fileInput');
-    $('#uploadBtn').addEventListener('click', () => fi.click());
-    fi.addEventListener('change', e => { if (e.target.files[0]) loadFile(e.target.files[0]); });
+    if (fi) {
+      fi.addEventListener('change', e => { if (e.target.files[0]) loadFile(e.target.files[0]); });
+    }
+    const uploadBtn = $('#uploadBtn');
+    if (uploadBtn) {
+      uploadBtn.addEventListener('click', () => fi?.click());
+    }
     const expBtn = $('#finExportBtn');
     if (expBtn) {
       expBtn.addEventListener('click', exportFinance);
-    } else {
-      console.error('Export Finance button not found');
     }
 
     const drop = $('#drop'); let dc = 0;
-    window.addEventListener('dragenter', e => { e.preventDefault(); dc++; drop.classList.add('show'); });
-    window.addEventListener('dragover', e => e.preventDefault());
-    window.addEventListener('dragleave', e => { dc--; if (dc <= 0) drop.classList.remove('show'); });
-    window.addEventListener('drop', e => { e.preventDefault(); dc = 0; drop.classList.remove('show'); const f = e.dataTransfer.files[0]; if (f) loadFile(f); });
+    if (drop) {
+      window.addEventListener('dragenter', e => { e.preventDefault(); dc++; drop.classList.add('show'); });
+      window.addEventListener('dragover', e => e.preventDefault());
+      window.addEventListener('dragleave', e => { dc--; if (dc <= 0) drop.classList.remove('show'); });
+      window.addEventListener('drop', e => { e.preventDefault(); dc = 0; drop.classList.remove('show'); const f = e.dataTransfer.files[0]; if (f) loadFile(f); });
+    }
   }
 
   async function loadFile(file) {
