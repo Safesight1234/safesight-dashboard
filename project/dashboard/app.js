@@ -754,15 +754,19 @@
 
   async function exportFinance() {
     try {
-      console.log('Export Finance clicked');
       const y = state.year;
-      const deals = wonDealsForYear(y).filter(d => !d.status || d.status === 'won');
-      console.log('Found deals:', deals.length);
+      let deals = wonDealsForYear(y).filter(d => !d.status || d.status === 'won');
 
-      if (!deals.length) { toast('No won deals to export for ' + y); return; }
+      // Filter by selected quarter/month
+      if (state.quarter !== 'all') {
+        const q = +state.quarter;
+        deals = deals.filter(d => quarterOf(d.d) === q);
+      }
 
-      // Create CSV for bookings
-      let bookingsCSV = 'Title\tCustomer Name\tDate Closed\tItem Name\tAmount (Euros)\tSales Rep\tIndustry\tBookings Type\tCountry\tPipeline\n';
+      if (!deals.length) { toast('No deals to export for selected period'); return; }
+
+      // Build data rows
+      const rows = [['Title', 'Customer Name', 'Date Closed', 'Item Name', 'Amount (Euros)', 'Sales Rep', 'Industry', 'Bookings Type', 'Country', 'Pipeline']];
       deals.forEach(d => {
         const items = [
           { name: 'NL ARR', val: d.nl_arr },
@@ -777,19 +781,17 @@
         ].filter(i => i.val > 0);
 
         items.forEach(item => {
-          bookingsCSV += `${esc(d.t)}\t${esc(d.c)}\t${d.d}\t${item.name}\t${item.val}\t${esc(d.rep || '')}\t${esc(d.ct || '')}\t${esc(d.ty || '')}\t${esc(d.co || '')}\t${esc(d.pi || '')}\n`;
+          rows.push([d.t, d.c, d.d, item.name, item.val, d.rep || '', d.ct || '', d.ty || '', d.co || '', d.pi || '']);
         });
       });
 
-      // Download
-      const blob = new Blob([bookingsCSV], { type: 'text/tab-separated-values' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `safesight-bookings-${y}.tsv`;
-      a.click();
-      URL.revokeObjectURL(url);
-      toast(`Exported ${deals.length} bookings for ${y}`);
+      // Convert to XLSX using SheetJS
+      if (!window.XLSX) { toast('Excel export not available'); return; }
+      const ws = window.XLSX.utils.aoa_to_sheet(rows);
+      const wb = window.XLSX.utils.book_new();
+      window.XLSX.utils.book_append_sheet(wb, ws, 'Bookings');
+      window.XLSX.writeFile(wb, `safesight-bookings-${y}-${state.quarter === 'all' ? 'all' : 'q' + state.quarter}.xlsx`);
+      toast(`Exported ${deals.length} bookings`);
     } catch (e) {
       toast('Export failed: ' + e.message);
     }
