@@ -40,9 +40,10 @@
   }
   const annual = (g, k) => g[k].reduce((a, b) => a + b, 0);
 
-  // deals without status field are treated as won (legacy data)
-  const isWon  = d => !d.status || d.status === 'won';
-  const isOpen = d => d.status === 'open';
+  const TODAY = new Date().toISOString().slice(0, 10);
+  // legacy data has no status — treat past-dated deals as won, future-dated as open
+  const isWon  = d => d.status === 'won'  || (!d.status && d.d <= TODAY);
+  const isOpen = d => d.status === 'open' || (!d.status && d.d >  TODAY);
 
   function fmtMoney(n) {
     const a = Math.abs(n);
