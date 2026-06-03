@@ -25,7 +25,7 @@ function httpsPost(hostname, path, body, headers = {}) {
 }
 
 async function getAccessToken() {
-  const ghToken     = (process.env.GITHUB_TOKEN || '').trim();
+  const ghToken     = (process.env.GH_PAT || '').trim();
   const refreshToken = await readRefreshToken(ghToken);
 
   const result = await httpsPost('focus.teamleader.eu', '/oauth2/access_token', {

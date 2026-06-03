@@ -48,9 +48,10 @@ exports.handler = async (event) => {
       redirect_uri:  redirectUri,
     });
 
-    if (!tokens.refresh_token) throw new Error('No refresh token in response');
+    if (tokens.error) throw new Error(`Teamleader error: ${tokens.error_description || tokens.error}`);
+    if (!tokens.refresh_token) throw new Error(`No refresh token returned. Response: ${JSON.stringify(tokens).slice(0, 200)}`);
 
-    const ghToken    = process.env.GITHUB_TOKEN;
+    const ghToken    = process.env.GH_PAT;
     const gistExists = !!process.env.TL_TOKEN_GIST_ID;
 
     let gistId = process.env.TL_TOKEN_GIST_ID;

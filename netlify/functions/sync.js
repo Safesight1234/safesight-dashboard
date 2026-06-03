@@ -99,13 +99,13 @@ exports.handler = async () => {
     fCustTy: process.env.TL_FIELD_CUSTTYPE,
   };
 
-  const ghToken = process.env.GITHUB_TOKEN;
+  const ghToken = process.env.GH_PAT;
   const ghRepo  = process.env.GITHUB_REPO || 'Safesight1234/safesight-dashboard';
 
   const missing = [];
   if (!process.env.TL_REFRESH_TOKEN) missing.push('TL_REFRESH_TOKEN');
   if (!cfg.p1 || !cfg.p2)            missing.push('TL_PIPELINE_1 / TL_PIPELINE_2');
-  if (!ghToken)                      missing.push('GITHUB_TOKEN');
+  if (!ghToken)                      missing.push('GH_PAT');
   if (missing.length) {
     return {
       statusCode: 400,
