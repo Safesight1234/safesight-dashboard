@@ -134,35 +134,37 @@ exports.handler = async () => {
     const userMap   = {};
     (usersResp.data || []).forEach(u => { userMap[u.id] = `${u.first_name} ${u.last_name}`.trim(); });
 
-    // Fetch open and won deals separately so one failing doesn't prevent the other
-    let openDeals = [], wonDeals = [];
+    // Fetch open, won, and lost deals separately
+    let openDeals = [], wonDeals = [], lostDeals = [];
     try {
       openDeals = await tlAll('deals.list', { filter: { pipeline_ids: [cfg.p1, cfg.p2], status: ['open'] }, includes: 'custom_fields' }, token);
     } catch (e) {
-      // status filter not supported for open — fetch all without filter and detect by won_at
       const all = await tlAll('deals.list', { filter: { pipeline_ids: [cfg.p1, cfg.p2] }, includes: 'custom_fields' }, token);
-      openDeals = all.filter(d => !d.won_at);
+      openDeals = all.filter(d => !d.won_at && !d.lost_at && !d.refused_at);
       wonDeals  = all.filter(d =>  d.won_at);
     }
     try {
-      if (!wonDeals.length) {
+      if (!wonDeals.length)
         wonDeals = await tlAll('deals.list', { filter: { pipeline_ids: [cfg.p1, cfg.p2], status: ['won'] }, includes: 'custom_fields' }, token);
-      }
-    } catch (e) {
-      // won filter failed but openDeals already set — wonDeals stays as whatever was set above
-    }
-    const rawDeals = openDeals.map(d => ({ ...d, _detectedStatus: 'open' }))
-                    .concat(wonDeals.map(d => ({ ...d, _detectedStatus: 'won' })));
+    } catch (e) {}
+    try {
+      lostDeals = await tlAll('deals.list', { filter: { pipeline_ids: [cfg.p1, cfg.p2], status: ['lost'] }, includes: 'custom_fields' }, token);
+    } catch (e) {}
 
-    // Determine won vs open/lost by dates (more reliable than status string)
+    const rawDeals = openDeals.map(d => ({ ...d, _detectedStatus: 'open' }))
+                    .concat(wonDeals.map(d => ({ ...d, _detectedStatus: 'won' })))
+                    .concat(lostDeals.map(d => ({ ...d, _detectedStatus: 'lost' })));
+
+    // Determine status and date
     const allDeals = rawDeals
       .map(d => ({
         ...d,
-        _isWon:  !!d.won_at,
-        _isLost: !!(d.lost_at || d.refused_at),
-        _date:   d.won_at || d.estimated_closing_date,
+        _isWon:   !!d.won_at,
+        _isLost:  !!(d.lost_at || d.refused_at),
+        _lostAt:  d.lost_at || d.refused_at || null,
+        _date:    d.won_at || d.lost_at || d.refused_at || d.estimated_closing_date,
       }))
-      .filter(d => d._date && !d._isLost); // skip lost and dateless deals
+      .filter(d => d._date); // only exclude dateless deals
 
     // Resolve company/contact names + country
     const companyIds = [...new Set(allDeals.filter(d => d.lead?.customer?.type === 'company').map(d => d.lead.customer.id))];
@@ -214,8 +216,10 @@ exports.handler = async () => {
         ty:      fieldValue(d, cfg.fType),
         co:      customer.co,
         pi:      getPipeline(d),
-        status:  d._detectedStatus || (d._isWon ? 'won' : 'open'),
+        stage:   d.pipeline_stage?.name || '',
+        status:  d._detectedStatus || (d._isWon ? 'won' : d._isLost ? 'lost' : 'open'),
         prob:    d.estimated_probability ?? null,
+        lostAt:  d._lostAt ? d._lostAt.slice(0, 10) : null,
       };
     });
 

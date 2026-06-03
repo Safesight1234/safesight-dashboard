@@ -61,25 +61,35 @@ exports.handler = async (event) => {
       }
     }
 
-    // Churn sheet: find year section and sum entries
-    // Row pattern: col[1] = year (e.g. "2026") marks start of a section; col[1] = customer name = entry
+    // Churn sheet: find year section, collect individual rows
     let churnTotal = 0, churnCount = 0, inYear = false;
+    const churnRowsOut = [];
     const yearStr = String(year);
     for (const row of churnRows) {
       const label = (row[1] || '').trim();
       if (label === yearStr) { inYear = true; continue; }
       if (inYear) {
-        // Stop at next year or empty section header
         if (/^\d{4}$/.test(label)) break;
         const rev = parseMoney(row[4]);
-        if (rev > 0 && label) { churnTotal += rev; churnCount++; }
+        if (label) {
+          churnTotal += rev; churnCount++;
+          // Try multiple column positions for "when" (month)
+          const when = (row[5] || row[6] || '').trim();
+          churnRowsOut.push({
+            customer: label,
+            industry: (row[2] || '').trim(),
+            reason:   (row[3] || '').trim(),
+            when,
+            revenue:  rev,
+          });
+        }
       }
     }
 
     return {
       statusCode: 200,
       headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
-      body: JSON.stringify({ arrTotal, total75, churnTotal, churnCount, year }),
+      body: JSON.stringify({ arrTotal, total75, churnTotal, churnCount, churnRows: churnRowsOut, year }),
     };
   } catch (err) {
     return {

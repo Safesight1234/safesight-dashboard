@@ -650,6 +650,39 @@ table.deals td.reason { color: var(--ink-dim); max-width: 420px; line-height: 1.
 @media (max-width: 900px) { .pipe-open .lb { grid-template-columns: 1fr; } }
 .panel-head h2 .subh { font-size: 12.5px; font-weight: 600; color: var(--ink-faint); margin-left: 6px; white-space: nowrap; }
 
+/* won deals list rows with rank + pill */
+.wrow { display: flex; align-items: flex-start; gap: 10px; padding: 5px 4px; }
+.wrow .rank { min-width: 20px; color: var(--ink-faint); font-size: 12px; font-weight: 700; padding-top: 2px; }
+.wrow-main { flex: 1; min-width: 0; }
+.wrow-top { display: flex; align-items: center; gap: 8px; flex-wrap: nowrap; }
+.wrow-top .who { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; font-size: 13.5px; }
+.wrow-top .amt { font-size: 13px; font-weight: 700; color: var(--ink); white-space: nowrap; }
+.wrow .barline { margin-top: 4px; height: 3px; background: rgba(255,255,255,.07); border-radius: 2px; overflow: hidden; }
+.wrow .barline i { display: block; height: 100%; background: var(--newlogo); border-radius: 2px; }
+
+/* pipeline two-column grid */
+.pipe-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 40px; }
+@media (max-width: 900px) { .pipe-grid { grid-template-columns: 1fr; } }
+.pgrid-item { padding: 4px 0; }
+.pgrid-top { display: flex; align-items: center; gap: 8px; }
+.pgrid-top .rank { min-width: 20px; color: var(--ink-faint); font-size: 12px; font-weight: 700; }
+.pgrid-top .who { flex: 1; font-weight: 600; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pgrid-top .amt { font-weight: 700; font-size: 13px; white-space: nowrap; }
+.pgrid-sub { font-size: 11.5px; color: var(--ink-faint); margin: 2px 0 4px 28px; }
+.pgrid-item .barline { margin-left: 28px; }
+
+/* funnel stage rows */
+.fnl-stage { padding: 10px 0; border-bottom: 1px solid var(--line); cursor: pointer; }
+.fnl-stage:last-child { border-bottom: none; }
+.fnl-head { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+.fnl-name { flex: 1; font-weight: 600; font-size: 13.5px; }
+.pill-prob { background: rgba(255,255,255,.1); border-radius: 12px; padding: 2px 8px; font-size: 11px; font-weight: 700; color: var(--ink-dim); }
+.fnl-bar { height: 8px; background: rgba(255,255,255,.07); border-radius: 4px; overflow: hidden; margin-bottom: 4px; }
+.fnl-bar i { display: block; height: 100%; background: var(--newlogo); border-radius: 4px; }
+.fnl-meta { font-size: 11.5px; color: var(--ink-faint); }
+.fnl-toggle { color: var(--newlogo); cursor: pointer; }
+.fnl-stage-detail .row { padding: 6px 16px; border-bottom: 1px solid rgba(255,255,255,.04); }
+
 /* ---------- financials tab ---------- */
 #tab-financials { display: flex; flex-direction: column; gap: var(--gap); }
 .grid-fin { display: grid; gap: var(--gap); grid-template-columns: 1fr 1fr 1fr; }
@@ -825,6 +858,16 @@ table.deals td.reason { color: var(--ink-dim); max-width: 420px; line-height: 1.
         <div class="panel-head"><h2>Rep leaderboard</h2></div>
         <div class="lb" id="lb"></div>
       </div>
+      <div class="panel">
+        <div class="panel-head"><h2>Sales by type</h2></div>
+        <div style="display:flex;gap:20px;align-items:center">
+          <div id="donut"></div>
+          <div id="donutLegend" style="flex:1"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="grid-lower2">
       <div class="panel">
         <div class="panel-head">
           <h2>Lost deals <span class="subh" id="lostSub"></span></h2>

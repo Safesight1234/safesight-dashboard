@@ -67,12 +67,14 @@
   function openDealsForYear(y) { return applyFilters(DATA.deals.filter(d => yearOf(d.d) === y && isOpen(d))); }
   function dealsForYear(y)     { return applyFilters(DATA.deals.filter(d => yearOf(d.d) === y)); }
 
-  function asOfMonth(y) { const ms = dealsForYear(y).map(d => monthOf(d.d)); return ms.length ? Math.max(...ms) : 11; }
+  // asOfMonth based on won deals so YTD label reflects last closed deal
+  function asOfMonth(y) { const ms = wonDealsForYear(y).map(d => monthOf(d.d)); return ms.length ? Math.max(...ms) : 11; }
 
+  // series of WON deals (bars in charts = won only, pipeline separate)
   function series(y, gran) {
     const n = gran === 'month' ? 12 : 4;
     const arr = Array.from({ length: n }, () => ({ nl: 0, us: 0, vl: 0, count: 0 }));
-    dealsForYear(y).forEach(d => {
+    wonDealsForYear(y).forEach(d => {
       const i = gran === 'month' ? monthOf(d.d) : quarterOf(d.d);
       arr[i].nl += d.nl; arr[i].us += d.us; arr[i].vl += d.vl; arr[i].count++;
     });
@@ -173,23 +175,23 @@
 
     // won-only scope for goal tracking
     const scWon = scopeWon(y);
-    const sales = sc.nl + sc.us;
     const wonSales = scWon.nl + scWon.us;
+    const pipeNL = sc.nl - scWon.nl, pipeUS = sc.us - scWon.us;
     const pr = progressBlock(wonSales, sc.gComb);
-    $('#kpiSales').textContent = fmtMoney(sales);
+    $('#kpiSales').textContent = fmtMoney(wonSales);
     $('#ytdLabel').textContent = sc.label + (sc.isQ ? '' : ' · YTD');
     $('#scopeNote').textContent = sc.isQ ? 'Quarter goal' : 'Annual goal';
     $('#pfill').style.width = Math.min(100, pr.pct) + '%';
     $('#ppct').textContent = pr.pctTxt;
     $('#goalAmt').textContent = fmtMoney(sc.gComb);
-    $('#pGoalNote').textContent = fmtMoney(wonSales) + ' won · ' + fmtMoney(sales - wonSales) + ' pipeline';
+    $('#pGoalNote').textContent = fmtMoney(wonSales) + ' won · ' + fmtMoney(sc.nl + sc.us - wonSales) + ' pipeline';
     $('#dealCount').textContent = scWon.n + ' won · ' + (sc.n - scWon.n) + ' open';
     $('#kpiSalesMeta').innerHTML = cmp ? deltaHTML(wonSales, scC.nl + scC.us, cmp) : '';
 
-    fillKPI('NL', sc.nl, scWon.nl, scWon.gNL, cmp ? scC.nl : null, cmp);
-    fillKPI('US', sc.us, scWon.us, scWon.gUS, cmp ? scC.us : null, cmp);
-    $('#kpiVL').textContent = fmtMoney(sc.vl);
-    $('#kpiVLMeta').innerHTML = cmp ? deltaHTML(sc.vl, scC.vl, cmp) : '<span class="submeta">no goal set</span>';
+    fillKPI('NL', scWon.nl, pipeNL, scWon.gNL, cmp ? scC.nl : null, cmp);
+    fillKPI('US', scWon.us, pipeUS, scWon.gUS, cmp ? scC.us : null, cmp);
+    $('#kpiVL').textContent = fmtMoney(scWon.vl);
+    $('#kpiVLMeta').innerHTML = cmp ? deltaHTML(scWon.vl, scC.vl, cmp) : '<span class="submeta">no goal set</span>';
 
     // count badges
     const arr = wonDealsForYear(y).filter(d => state.quarter === 'all' || quarterOf(d.d) === +state.quarter);
@@ -197,9 +199,9 @@
     if (nlEl) nlEl.textContent = arr.filter(d => d.nl > 0).length || '';
     if (usEl) usEl.textContent = arr.filter(d => d.us > 0).length || '';
 
-    // churn KPI — placeholder (no churn data from TL)
-    const chEl = $('#kpiChurn'); if (chEl) chEl.textContent = '—';
-    const chMeta = $('#kpiChurnMeta'); if (chMeta) chMeta.textContent = 'no churn data';
+    // churn KPI — loaded async from Google Sheets
+    const chEl = $('#kpiChurn'); if (chEl) chEl.textContent = '…';
+    const chMeta = $('#kpiChurnMeta'); if (chMeta) chMeta.textContent = 'loading…';
 
     renderMainChart(y, cmp);
     renderStreamChart('nl', '#nlChart', '#nlTotal');
@@ -208,6 +210,8 @@
     renderLeaderboard(y);
     renderTable(y);
     renderWonList(y);
+    renderLostDeals(y);
+    renderChurn(y);
   }
 
   function scopeFor(yr, like) {
@@ -219,14 +223,13 @@
     return { nl: sum(arr, 'nl'), us: sum(arr, 'us'), vl: sum(arr, 'vl'), n: arr.length };
   }
 
-  function fillKPI(id, total, won, goal, prev, cmp) {
-    $('#kpi' + id).textContent = fmtMoney(total);
+  function fillKPI(id, won, pipeline, goal, prev, cmp) {
+    $('#kpi' + id).textContent = fmtMoney(won);
     const pct = goal > 0 ? (won / goal) * 100 : 0;
     $('#p' + id + 'fill').style.width = Math.min(100, pct) + '%';
-    const pipe = total - won;
     $('#kpi' + id + 'Meta').innerHTML =
       `<span class="goalpct">${pct.toFixed(0)}% of ${fmtMoney(goal)}</span>` +
-      (pipe > 0 ? ` <span class="submeta">+${fmtMoney(pipe)} pipeline</span>` : '') +
+      (pipeline > 0 ? ` <span class="submeta">+${fmtMoney(pipeline)} pipeline</span>` : '') +
       (cmp ? ' ' + deltaHTML(won, prev, cmp) : '');
   }
 
@@ -235,6 +238,28 @@
     const q = +state.quarter;
     return state.gran === 'month' ? [q * 3, q * 3 + 1, q * 3 + 2] : [q];
   }
+
+  // ── Tooltip ──────────────────────────────────────────────────────────────
+  let _tip = null;
+  function getTip() {
+    if (!_tip) {
+      _tip = document.createElement('div');
+      _tip.style.cssText = 'position:fixed;background:#1e293b;border:1px solid #334155;border-radius:8px;padding:10px 14px;font-size:12px;color:#e2e8f0;pointer-events:none;z-index:9999;display:none;max-width:280px;box-shadow:0 8px 24px rgba(0,0,0,.5);line-height:1.6';
+      document.body.appendChild(_tip);
+    }
+    return _tip;
+  }
+  function showTip(e, html) {
+    const t = getTip(); t.innerHTML = html; t.style.display = 'block'; moveTip(e);
+  }
+  function moveTip(e) {
+    const t = getTip();
+    t.style.left = Math.min(e.clientX + 14, window.innerWidth - t.offsetWidth - 10) + 'px';
+    t.style.top  = Math.min(e.clientY + 14, window.innerHeight - t.offsetHeight - 10) + 'px';
+  }
+  function hideTip() { getTip().style.display = 'none'; }
+
+  const _barDeals = {};
 
   function renderMainChart(y, cmp) {
     const gran = state.gran;
@@ -246,39 +271,62 @@
     const idxs = vis || data.map((_, i) => i);
     const cmpData = cmp ? series(cmp, gran) : null;
 
-    const totals = idxs.map(i => data[i].nl + data[i].us + (state.includeVL ? data[i].vl : 0));
-    const cmpTot = cmp ? idxs.map(i => cmpData[i].nl + cmpData[i].us + (state.includeVL ? cmpData[i].vl : 0)) : [];
+    // pre-index won deals per period for hover tooltips
+    const allWon = wonDealsForYear(y);
+    idxs.forEach(i => {
+      const key = `${y}-${gran}-${i}`;
+      _barDeals[key] = allWon.filter(d => (gran === 'month' ? monthOf(d.d) : quarterOf(d.d)) === i);
+    });
+
+    const totals = idxs.map(i => data[i].nl + data[i].us);
+    const cmpTot = cmp ? idxs.map(i => cmpData[i].nl + cmpData[i].us) : [];
     const goalsArr = idxs.map(perGoal);
     const max = Math.max(1, ...totals, ...cmpTot, ...goalsArr) * 1.08;
     const H = 300;
 
     const cols = idxs.map((i) => {
       const d = data[i];
-      const total = d.nl + d.us + (state.includeVL ? d.vl : 0);
+      const total = d.nl + d.us;
       const goal = perGoal(i);
       let inner;
       if (cmp) {
-        const ctot = cmpData[i].nl + cmpData[i].us + (state.includeVL ? cmpData[i].vl : 0);
+        const ctot = cmpData[i].nl + cmpData[i].us;
         inner = `<div class="grp">
-          <div class="gbar cur" style="height:${(total / max) * (H - 22)}px" title="${y}: ${fmtFull(total)}"></div>
-          <div class="gbar cmp" style="height:${(ctot / max) * (H - 22)}px" title="${cmp}: ${fmtFull(ctot)}"></div>
+          <div class="gbar cur" style="height:${(total / max) * (H - 22)}px"></div>
+          <div class="gbar cmp" style="height:${(ctot / max) * (H - 22)}px"></div>
         </div>`;
       } else {
-        const segs = [['nl', d.nl], ['us', d.us]]; if (state.includeVL) segs.push(['vl', d.vl]);
+        const segs = [['nl', d.nl], ['us', d.us]];
         inner = `<div class="bar-stack" style="height:${Math.max((total / max) * (H - 22), total > 0 ? 3 : 0)}px">` +
           segs.filter(s => s[1] > 0).map(([k, v]) => `<div class="bar-seg ${k}" style="height:${(v / total) * 100}%"></div>`).join('') + `</div>`;
       }
-      return `<div class="bar-col">
-        <div class="vlab">${fmtMoney(total)}${cmp ? ' / ' + fmtMoney(cmpData[i].nl + cmpData[i].us + (state.includeVL ? cmpData[i].vl : 0)) : ''}</div>
-        <div class="goal-tick" style="bottom:${(goal / max) * (H - 22) + 22}px" title="Goal ${fmtFull(goal)}"></div>
+      return `<div class="bar-col" data-bkey="${y}-${gran}-${i}">
+        <div class="vlab">${fmtMoney(total)}${cmp ? ' / ' + fmtMoney(cmpData[i].nl + cmpData[i].us) : ''}</div>
+        <div class="goal-tick" style="bottom:${(goal / max) * (H - 22) + 22}px"></div>
         ${inner}
         <div class="xlab">${labs[i]}</div>
       </div>`;
     }).join('');
 
-    $('#mainChart').innerHTML = `<div class="bars-wrap"><div class="bars" style="height:${H}px">${cols}</div></div>`;
+    const wrap = $('#mainChart');
+    wrap.innerHTML = `<div class="bars-wrap"><div class="bars" style="height:${H}px">${cols}</div></div>`;
+
+    // hover tooltips showing won deals for that period
+    wrap.onmousemove = e => {
+      const col = e.target.closest('[data-bkey]'); if (!col) { hideTip(); return; }
+      moveTip(e);
+      const deals = _barDeals[col.dataset.bkey] || [];
+      if (!deals.length) { hideTip(); return; }
+      const label = col.querySelector('.xlab')?.textContent || '';
+      const topDeals = deals.slice().sort((a, b) => (b.nl + b.us) - (a.nl + a.us)).slice(0, 10);
+      const rows = topDeals.map(d => `<div style="display:flex;justify-content:space-between;gap:16px"><span>${esc(d.t || d.c)}</span><span style="color:#94a3b8">${fmtMoney(d.nl + d.us)}</span></div>`).join('');
+      const total = deals.reduce((s, d) => s + d.nl + d.us, 0);
+      showTip(e, `<div style="font-weight:700;margin-bottom:6px;color:#38bdf8">${label} · ${deals.length} won · ${fmtMoney(total)}</div>${rows}${deals.length > 10 ? `<div style="color:#64748b;margin-top:4px">+${deals.length - 10} more</div>` : ''}`);
+    };
+    wrap.onmouseleave = hideTip;
+
     $('#mainTitle').textContent = `Sales by ${gran === 'month' ? 'month' : 'quarter'} · ${y}` + (cmp ? ` vs ${cmp}` : '');
-    $('#vlLegend').classList.toggle('hidden', !state.includeVL);
+    $('#vlLegend').classList.toggle('hidden', true); // VL not in main chart
     $('#cmpLegend').classList.toggle('hidden', !cmp);
     $('#cmpLegYear').textContent = cmp || '';
     $('#curLegYear').textContent = y;
@@ -313,24 +361,28 @@
   }
 
   function renderBreakdown(sc) {
-    const parts = [['New logo', sc.nl, 'var(--newlogo)'], ['Upsell', sc.us, 'var(--upsell)'], ['Renewal', sc.vl, 'var(--renewal)']];
-    const total = parts.reduce((s, p) => s + p[1], 0) || 1;
+    const donutEl = $('#donut'); if (!donutEl) return;
+    const scWon = scopeWon(state.year);
+    const parts = [['New logo', scWon.nl, 'var(--newlogo)'], ['Upsell', scWon.us, 'var(--upsell)'], ['Renewal', scWon.vl, 'var(--renewal)']];
+    const salesTotal = scWon.nl + scWon.us; // NL+US only, no renewal
+    const ringTotal = parts.reduce((s, p) => s + p[1], 0) || 1;
     let acc = 0; const R = 62, C = 2 * Math.PI * R;
     const rings = parts.map(([nm, v, col]) => {
-      const frac = v / total, len = frac * C, off = acc * C; acc += frac;
+      const frac = v / ringTotal, len = frac * C, off = acc * C; acc += frac;
       return `<circle r="${R}" cx="80" cy="80" fill="none" stroke="${col}" stroke-width="22" stroke-dasharray="${len} ${C - len}" stroke-dashoffset="${-off}" transform="rotate(-90 80 80)"></circle>`;
     }).join('');
-    $('#donut').innerHTML = `<svg class="donut" width="160" height="160" viewBox="0 0 160 160">
+    donutEl.innerHTML = `<svg class="donut" width="160" height="160" viewBox="0 0 160 160">
       <circle r="62" cx="80" cy="80" fill="none" stroke="rgba(255,255,255,.05)" stroke-width="22"></circle>${rings}
-      <text x="80" y="74" text-anchor="middle" fill="var(--ink)" font-size="20" font-weight="800">${fmtMoney(total)}</text>
-      <text x="80" y="94" text-anchor="middle" fill="var(--ink-faint)" font-size="11" font-weight="600">${sc.isQ ? sc.label : 'YTD total'}</text></svg>`;
-    $('#donutLegend').innerHTML = parts.map(([nm, v, col]) =>
-      `<div class="row"><span class="dot" style="background:${col}"></span><span class="nm">${nm}</span><span class="vl2">${fmtMoney(v)}</span><span class="submeta" style="width:38px;text-align:right">${Math.round(v / total * 100)}%</span></div>`).join('');
+      <text x="80" y="74" text-anchor="middle" fill="var(--ink)" font-size="20" font-weight="800">${fmtMoney(salesTotal)}</text>
+      <text x="80" y="94" text-anchor="middle" fill="var(--ink-faint)" font-size="11" font-weight="600">${sc.isQ ? sc.label : 'YTD won'}</text></svg>`;
+    const legEl = $('#donutLegend');
+    if (legEl) legEl.innerHTML = parts.map(([nm, v, col]) =>
+      `<div class="row"><span class="dot" style="background:${col}"></span><span class="nm">${nm}</span><span class="vl2">${fmtMoney(v)}</span><span class="submeta" style="width:38px;text-align:right">${Math.round(v / ringTotal * 100)}%</span></div>`).join('');
   }
 
   function renderLeaderboard(y) {
     const map = {};
-    let arr = dealsForYear(y);
+    let arr = wonDealsForYear(y);
     if (state.quarter !== 'all') arr = arr.filter(d => quarterOf(d.d) === +state.quarter);
     arr.forEach(d => { if (d.rep) map[d.rep] = (map[d.rep] || 0) + d.nl + d.us; });
     const rows = Object.entries(map).sort((a, b) => b[1] - a[1]);
@@ -350,132 +402,219 @@
   }
 
   function renderTable(y) {
+    const body = $('#dealsBody'); if (!body) return;
     let arr = dealsForYear(y);
     if (state.quarter !== 'all') arr = arr.filter(d => quarterOf(d.d) === +state.quarter);
     const rows = arr.slice().sort((a, b) => b.d.localeCompare(a.d)).slice(0, 8);
-    $('#dealsBody').innerHTML = rows.length ? rows.map(d => {
+    body.innerHTML = rows.length ? rows.map(d => {
       const amt = d.nl + d.us + d.vl;
       return `<tr><td class="name">${esc(d.t || d.c)}</td><td>${esc(d.c)}</td><td>${typePill(d)}</td><td>${esc(d.rep || '—')}</td><td>${d.d}</td><td class="amt">${fmtFull(amt)}</td></tr>`;
     }).join('') : '<tr><td colspan="6" class="empty">No deals in selection</td></tr>';
+  }
+
+  function renderLostDeals(y) {
+    const body = $('#lostBody'); if (!body) return;
+    const isLost = d => d.status === 'lost';
+    let arr = applyFilters(DATA.deals.filter(d => yearOf(d.d) === y && isLost(d)));
+    if (state.quarter !== 'all') arr = arr.filter(d => quarterOf(d.d) === +state.quarter);
+    arr = arr.slice().sort((a, b) => b.d.localeCompare(a.d));
+    const sub = $('#lostSub'), tot = $('#lostTot');
+    const total = arr.reduce((s, d) => s + d.nl + d.us + d.vl, 0);
+    if (sub) sub.textContent = arr.length + ' deals';
+    if (tot) tot.textContent = fmtMoney(total);
+    body.innerHTML = arr.length ? arr.slice(0, 30).map(d => {
+      const amt = d.nl + d.us + d.vl;
+      return `<tr><td class="name">${esc(d.t || d.c)}</td><td>${esc(d.c)}</td><td>${typePill(d)}</td><td>${esc(d.rep || '—')}</td><td>${d.lostAt || d.d}</td><td class="amt">${fmtFull(amt)}</td></tr>`;
+    }).join('') : '<tr><td colspan="6" class="empty">No lost deals in selection</td></tr>';
   }
 
   function renderWonList(y) {
     const wonEl = $('#wonList'); if (!wonEl) return;
     let arr = wonDealsForYear(y);
     if (state.quarter !== 'all') arr = arr.filter(d => quarterOf(d.d) === +state.quarter);
-    arr = arr.slice().sort((a, b) => b.d.localeCompare(a.d));
-    const max = arr.reduce((m, d) => Math.max(m, d.nl + d.us + d.vl), 1);
-    const total = arr.reduce((s, d) => s + d.nl + d.us + d.vl, 0);
+    arr = arr.slice().sort((a, b) => (b.nl + b.us) - (a.nl + a.us));
+    const max = arr.reduce((m, d) => Math.max(m, d.nl + d.us), 1);
+    const total = arr.reduce((s, d) => s + d.nl + d.us, 0);
     const sub = $('#wonSub'), tot = $('#wonTot');
     if (sub) sub.textContent = arr.length + ' deals';
     if (tot) tot.textContent = fmtMoney(total);
-    wonEl.innerHTML = arr.length ? arr.slice(0, 30).map(d => {
-      const v = d.nl + d.us + d.vl;
-      return `<div class="row"><span class="who">${esc(d.t || d.c)}</span><span class="submeta">${d.d}</span><span class="amt">${fmtMoney(v)}</span><span class="barline"><i style="width:${(v / max) * 100}%"></i></span></div>`;
+    wonEl.innerHTML = arr.length ? arr.slice(0, 30).map((d, i) => {
+      const v = d.nl + d.us;
+      return `<div class="wrow">
+        <span class="rank">${i + 1}</span>
+        <div class="wrow-main">
+          <div class="wrow-top"><span class="who">${esc(d.t || d.c)}</span>${typePill(d)}<span class="amt">${fmtMoney(v)}</span></div>
+          <div class="barline"><i style="width:${(v / max) * 100}%"></i></div>
+        </div>
+      </div>`;
     }).join('') : '<div class="empty">No won deals in selection</div>';
   }
 
   // ---------- PIPELINE TAB ----------
   function renderPipeline() {
     const y = state.year;
-    const open = openDealsForYear(y);
+    const allOpen = openDealsForYear(y);
+    const scoped = state.quarter === 'all' ? allOpen : allOpen.filter(d => quarterOf(d.d) === +state.quarter);
 
-    // filter by quarter/month if focused
-    const scoped = state.quarter === 'all'
-      ? open
-      : open.filter(d => quarterOf(d.d) === +state.quarter);
+    const qLabel = state.quarter === 'all' ? String(y) : `Q${+state.quarter + 1} '${String(y).slice(2)}`;
+    const wt = d => (d.nl + d.us + d.vl) * (d.prob || 0);
 
-    // quarter cards (open pipeline value by quarter)
-    const q = Array.from({ length: 4 }, () => { const o = { total: 0, n: 0 }; PIPES.forEach(p => o[p] = 0); return o; });
-    open.forEach(d => {
-      const i = quarterOf(d.d);
-      const v = d.nl + d.us + d.vl;
-      q[i][d.pi] = (q[i][d.pi] || 0) + v;
-      q[i].total += v;
-      q[i].n++;
-    });
+    const nlDeals  = scoped.filter(d => d.pi === "New logo's");
+    const usDeals  = scoped.filter(d => d.pi === 'Customer Growth');
+    const vlDeals  = scoped.filter(d => d.vl > 0);
+    const nlTotal  = nlDeals.reduce((s, d) => s + d.nl + d.us, 0);
+    const usTotal  = usDeals.reduce((s, d) => s + d.nl + d.us, 0);
+    const vlTotal  = vlDeals.reduce((s, d) => s + d.vl, 0);
+    const allTotal = scoped.reduce((s, d) => s + d.nl + d.us + d.vl, 0);
+    const nlWt = nlDeals.reduce((s, d) => s + wt(d), 0);
+    const usWt = usDeals.reduce((s, d) => s + wt(d), 0);
+    const vlWt = vlDeals.reduce((s, d) => s + wt(d), 0);
+    const allWt = scoped.reduce((s, d) => s + wt(d), 0);
 
-    $('#pipeCards').innerHTML = QS.map((ql, i) => {
-      const c = q[i]; const nlp = c["New logo's"] || 0, cgp = c["Customer Growth"] || 0;
-      const t = c.total || 1;
-      return `<div class="panel pq">
-        <div class="ptitle">${ql} ${y}</div>
-        <div class="big">${fmtMoney(c.total)}</div>
-        <div class="submeta" style="margin:6px 0 14px">${c.n} deals</div>
-        <div class="splitbar"><i class="s-nl" style="width:${nlp / t * 100}%"></i><i class="s-cg" style="width:${cgp / t * 100}%"></i></div>
-        <div class="splitleg"><span><span class="dot" style="background:var(--newlogo)"></span>New logo's ${fmtMoney(nlp)}</span><span><span class="dot" style="background:var(--upsell)"></span>Customer Growth ${fmtMoney(cgp)}</span></div>
-      </div>`;
-    }).join('');
+    // Type-based pipeline cards
+    $('#pipeCards').innerHTML = [
+      { label: 'OPEN PIPELINE', v: allTotal, wv: allWt, n: scoped.length, col: 'var(--ink)' },
+      { label: 'NEW LOGO',      v: nlTotal,  wv: nlWt,  n: nlDeals.length, col: 'var(--newlogo)' },
+      { label: 'UPSELL',        v: usTotal,  wv: usWt,  n: usDeals.length, col: 'var(--upsell)' },
+      { label: 'RENEWALS DUE',  v: vlTotal,  wv: vlWt,  n: vlDeals.length, col: 'var(--renewal)' },
+    ].map(({ label, v, wv, n, col }) => `<div class="panel pq">
+      <div class="ptitle" style="color:${col}">${label}</div>
+      <div class="big">${fmtMoney(v)}</div>
+      <div class="submeta">${n} deals · ${fmtMoney(wv)} weighted</div>
+    </div>`).join('');
 
-    // open deals list
+    // Open deals — two-column grid
     const topEl = $('#pipeTop');
     if (topEl) {
       const sorted = scoped.slice().sort((a, b) => (b.nl + b.us + b.vl) - (a.nl + a.us + a.vl));
       const maxV = sorted.length ? sorted[0].nl + sorted[0].us + sorted[0].vl : 1;
       const sub = $('#pipeOpenSub'), tot = $('#pipeTopTot');
-      if (sub) sub.textContent = sorted.length + ' deals';
-      if (tot) tot.textContent = fmtMoney(sorted.reduce((s, d) => s + d.nl + d.us + d.vl, 0));
-      topEl.innerHTML = sorted.length ? sorted.slice(0, 20).map(d => {
+      if (sub) sub.textContent = sorted.length + ' in ' + qLabel;
+      if (tot) tot.textContent = qLabel + ' · ' + fmtMoney(sorted.reduce((s, d) => s + d.nl + d.us + d.vl, 0));
+      topEl.innerHTML = sorted.length ? `<div class="pipe-grid">${sorted.map((d, i) => {
         const v = d.nl + d.us + d.vl;
-        const prob = d.prob != null ? ` · ${Math.round(d.prob)}%` : '';
-        return `<div class="row"><span class="who">${esc(d.t || d.c)}</span><span class="submeta">${esc(d.rep || '')}${prob}</span><span class="amt">${fmtMoney(v)}</span><span class="barline"><i style="width:${(v / maxV) * 100}%"></i></span></div>`;
-      }).join('') : '<div class="empty">No open deals</div>';
+        return `<div class="pgrid-item">
+          <div class="pgrid-top"><span class="rank">${i + 1}</span><span class="who">${esc(d.t || d.c)}</span>${pipePill(d.pi)}<span class="amt">${fmtMoney(v)}</span></div>
+          <div class="pgrid-sub">${esc(d.rep || '')} · close ${d.d}</div>
+          <div class="barline"><i style="width:${(v / maxV) * 100}%;background:${d.pi === "New logo's" ? 'var(--newlogo)' : d.vl > 0 ? 'var(--renewal)' : 'var(--upsell)'}"></i></div>
+        </div>`;
+      }).join('')}</div>` : '<div class="empty">No open deals</div>';
     }
 
-    // pipeline per person
+    // New logo funnel — group by stage (using prob as stage proxy)
+    const funnelEl = $('#funnel');
+    if (funnelEl) {
+      const nlOpen = nlDeals.slice().sort((a, b) => (b.nl + b.us) - (a.nl + a.us));
+      const totalNL = nlOpen.reduce((s, d) => s + d.nl + d.us, 0);
+      const totalWt = nlOpen.reduce((s, d) => s + wt(d), 0);
+      const fTot = $('#funnelTot');
+      if (fTot) fTot.innerHTML = `${fmtMoney(totalNL)} <span class="ofgoal">/ ${fmtMoney(totalWt)} weighted</span>`;
+
+      // Group by stage name (from sync) or fall back to prob buckets
+      const STAGES = [
+        { name: 'First contact',     prob: 0.10 },
+        { name: 'Discovery / meeting', prob: 0.20 },
+        { name: 'Follow-up / demo',  prob: 0.40 },
+        { name: 'Proposal sent',     prob: 0.50 },
+        { name: 'High probability',  prob: 0.75 },
+      ];
+      const stageBuckets = STAGES.map(s => ({ ...s, deals: [] }));
+      const otherDeals = [];
+      nlOpen.forEach(d => {
+        const p = d.prob || 0;
+        const bucket = stageBuckets.find(s => Math.abs(s.prob - p) < 0.06 || (d.stage && d.stage === s.name));
+        if (bucket) bucket.deals.push(d);
+        else otherDeals.push(d);
+      });
+      const activeStages = stageBuckets.filter(s => s.deals.length > 0);
+      if (otherDeals.length) activeStages.push({ name: 'Other', prob: null, deals: otherDeals });
+
+      let fDetail = '';
+      funnelEl.innerHTML = activeStages.length ? activeStages.map(s => {
+        const sv = s.deals.reduce((t, d) => t + d.nl + d.us, 0);
+        const sw = s.deals.reduce((t, d) => t + wt(d), 0);
+        const pct = totalNL > 0 ? sv / totalNL * 100 : 0;
+        const probLabel = s.prob != null ? `<span class="pill-prob">${Math.round(s.prob * 100)}%</span>` : '';
+        const stageId = 'fs-' + s.name.replace(/\W/g, '');
+        fDetail += `<div class="fnl-stage-detail" id="${stageId}" style="display:none">${s.deals.map(d =>
+          `<div class="row"><span class="who">${esc(d.t || d.c)}</span><span class="submeta">${esc(d.rep || '')}</span><span class="amt">${fmtMoney(d.nl + d.us)}</span></div>`
+        ).join('')}</div>`;
+        return `<div class="fnl-stage" data-detail="${stageId}">
+          <div class="fnl-head"><span class="fnl-name">${esc(s.name)}</span>${probLabel}<span class="amt">${fmtMoney(sv)}</span></div>
+          <div class="fnl-bar"><i style="width:${pct}%"></i></div>
+          <div class="fnl-meta">${s.deals.length} deal${s.deals.length !== 1 ? 's' : ''} · ${fmtMoney(sw)} weighted · <span class="fnl-toggle">click to see deals</span></div>
+        </div>`;
+      }).join('') : '<div class="empty">No new logo deals in pipeline</div>';
+
+      const fDetEl = $('#funnelDetail');
+      if (fDetEl) {
+        fDetEl.innerHTML = fDetail;
+        funnelEl.querySelectorAll('.fnl-stage').forEach(el => {
+          el.addEventListener('click', () => {
+            const det = document.getElementById(el.dataset.detail);
+            if (det) det.style.display = det.style.display === 'none' ? 'block' : 'none';
+          });
+        });
+      }
+    }
+
+    // Pipeline per person
     const repsEl = $('#pipeReps');
     if (repsEl) {
-      const map = {};
-      scoped.forEach(d => { if (d.rep) map[d.rep] = (map[d.rep] || 0) + d.nl + d.us + d.vl; });
-      const rows = Object.entries(map).sort((a, b) => b[1] - a[1]);
+      const repMap = {}, repCount = {};
+      scoped.forEach(d => {
+        if (!d.rep) return;
+        repMap[d.rep]   = (repMap[d.rep] || 0) + d.nl + d.us + d.vl;
+        repCount[d.rep] = (repCount[d.rep] || 0) + 1;
+      });
+      const rows = Object.entries(repMap).sort((a, b) => b[1] - a[1]);
       const maxR = rows.length ? rows[0][1] : 1;
       const tot = $('#pipeRepsTot');
       if (tot) tot.textContent = fmtMoney(rows.reduce((s, r) => s + r[1], 0));
       repsEl.innerHTML = rows.length ? rows.map(([nm, v], i) =>
-        `<div class="row"><span class="rank">${i + 1}</span><span class="who">${esc(nm)}</span><span class="amt">${fmtMoney(v)}</span><span class="barline"><i style="width:${(v / maxR) * 100}%"></i></span></div>`).join('')
+        `<div class="row"><span class="rank">${i + 1}</span><span class="who">${esc(nm)}</span><span class="submeta">${repCount[nm]} deal${repCount[nm] !== 1 ? 's' : ''}</span><span class="amt">${fmtMoney(v)}</span><span class="barline"><i style="width:${(v / maxR) * 100}%"></i></span></div>`).join('')
         : '<div class="empty">No open deals</div>';
     }
 
-    // funnel — group by pipeline
-    const funnelEl = $('#funnel');
-    if (funnelEl) {
-      const nlDeals = scoped.filter(d => d.pi === "New logo's");
-      const nlTotal = nlDeals.reduce((s, d) => s + d.nl + d.us + d.vl, 0);
-      const fTot = $('#funnelTot'), fDet = $('#funnelDetail');
-      if (fTot) fTot.textContent = fmtMoney(nlTotal);
-      funnelEl.innerHTML = nlDeals.length
-        ? `<div class="lb">` + nlDeals.slice().sort((a, b) => (b.nl + b.us + b.vl) - (a.nl + a.us + a.vl)).slice(0, 10).map(d => {
-            const v = d.nl + d.us + d.vl;
-            return `<div class="row"><span class="who">${esc(d.t || d.c)}</span><span class="submeta">${d.d}</span><span class="amt">${fmtMoney(v)}</span></div>`;
-          }).join('') + `</div>`
-        : '<div class="empty">No new logo deals in pipeline</div>';
-      if (fDet) fDet.innerHTML = '';
-    }
-
-    // upcoming renewals — open deals with vl > 0
+    // Upcoming renewals
     const renewEl = $('#renewalList');
     if (renewEl) {
-      const renewals = open.filter(d => d.vl > 0).sort((a, b) => a.d.localeCompare(b.d));
+      const renewals = allOpen.filter(d => d.vl > 0).sort((a, b) => a.d.localeCompare(b.d));
       const sub = $('#renewalSub'), tot = $('#renewalTot');
-      if (sub) sub.textContent = renewals.length + ' deals';
-      if (tot) tot.textContent = fmtMoney(renewals.reduce((s, d) => s + d.vl, 0));
-      renewEl.innerHTML = renewals.length ? renewals.slice(0, 20).map(d =>
-        `<div class="row"><span class="who">${esc(d.t || d.c)}</span><span class="submeta">${d.d} · ${esc(d.rep || '')}</span><span class="amt">${fmtMoney(d.vl)}</span></div>`
+      if (sub) sub.textContent = renewals.length + ' in ' + qLabel;
+      const vlTotalAll = renewals.reduce((s, d) => s + d.vl, 0);
+      const vlWtAll    = renewals.reduce((s, d) => s + d.vl * (d.prob || 0), 0);
+      if (tot) tot.innerHTML = `${fmtMoney(vlTotalAll)} <span class="ofgoal">/ ${fmtMoney(vlWtAll)} weighted</span>`;
+      const maxR2 = renewals.length ? renewals[0].vl : 1;
+      renewEl.innerHTML = renewals.length ? renewals.slice(0, 30).map((d, i) =>
+        `<div class="row"><span class="rank">${i + 1}</span><span class="who">${esc(d.t || d.c)}</span><span class="submeta">${qLabel} · ${esc(d.rep || '')}</span><span class="amt">${fmtMoney(d.vl)}</span><span class="barline"><i style="width:${(d.vl / maxR2) * 100}%;background:var(--renewal)"></i></span></div>`
       ).join('') : '<div class="empty">No upcoming renewals</div>';
     }
 
-    // deal table grouped by quarter
-    const byq = [[], [], [], []]; open.forEach(d => byq[quarterOf(d.d)].push(d));
-    $('#pipeTableWrap').innerHTML = QS.map((ql, i) => {
-      const rows = byq[i].sort((a, b) => (b.nl + b.us + b.vl) - (a.nl + a.us + a.vl));
-      if (!rows.length) return `<div class="qgroup"><h3>${ql} ${y}</h3><div class="empty">No open deals</div></div>`;
-      return `<div class="qgroup"><h3>${ql} ${y} · ${rows.length} deals · ${fmtMoney(rows.reduce((s, d) => s + d.nl + d.us + d.vl, 0))}</h3>
-        <table class="deals"><thead><tr><th>Deal</th><th>Customer</th><th>Pipeline</th><th>Owner</th><th>Close date</th><th style="text-align:right">Value</th></tr></thead><tbody>` +
-        rows.map(d => `<tr><td class="name">${esc(d.t || d.c)}</td><td>${esc(d.c)}</td><td>${pipePill(d.pi)}</td><td>${esc(d.rep || '—')}</td><td>${d.d}</td><td class="amt">${fmtFull(d.nl + d.us + d.vl)}</td></tr>`).join('') +
-        `</tbody></table></div>`;
-    }).join('');
+    // Remove old Q-by-Q table
+    const tw = $('#pipeTableWrap'); if (tw) tw.innerHTML = '';
+  }
 
-    const py = $('#pipeYear'); if (py) py.textContent = y;
+  async function renderChurn(y) {
+    const body = $('#churnBody'); if (!body) return;
+    const sub = $('#churnSub'), tot = $('#churnTot');
+    body.innerHTML = '<tr><td colspan="5" class="empty">Loading…</td></tr>';
+    try {
+      const r = await fetch(`/.netlify/functions/finance-data?year=${y}`);
+      const d = await r.json();
+      if (d.error) throw new Error(d.error);
+      if (sub) sub.textContent = (d.churnCount || 0) + ' in YTD ' + y;
+      if (tot) tot.textContent = fmtMoney(d.churnTotal) + ' churned';
+      const rows = d.churnRows || [];
+      body.innerHTML = rows.length ? rows.map(r =>
+        `<tr><td class="name">${esc(r.customer)}</td><td>${esc(r.industry)}</td><td>${esc(r.reason)}</td><td>${esc(r.when)}</td><td class="amt">${fmtFull(r.revenue)}</td></tr>`
+      ).join('') : '<tr><td colspan="5" class="empty">No churn data for ' + y + '</td></tr>';
+      // Also update Churn KPI
+      const chEl = $('#kpiChurn'); if (chEl) chEl.textContent = fmtMoney(d.churnTotal);
+      const chMeta = $('#kpiChurnMeta'); if (chMeta) chMeta.textContent = (d.churnCount || 0) + ' customers · ' + y + ' lost ARR';
+    } catch (e) {
+      body.innerHTML = '<tr><td colspan="5" class="empty">Churn data unavailable</td></tr>';
+    }
   }
 
   function pipePill(p) {
