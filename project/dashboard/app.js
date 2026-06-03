@@ -10,15 +10,10 @@
   const PIPES = ["New logo's", "Customer Growth"];
 
   // ---------- load ----------
-  let DATA = null;
-  try { const s = localStorage.getItem(LS.data); if (s) DATA = JSON.parse(s); } catch (e) {}
-  // Always prefer embedded data when it's newer than what's in localStorage
-  const emb = window.SAFESIGHT_DEFAULT;
-  if (!DATA || !DATA.deals || !DATA.deals.length ||
-      (emb && emb.generated && (!DATA.generated || emb.generated > DATA.generated))) {
-    DATA = emb;
-    try { localStorage.removeItem(LS.data); } catch (e) {}
-  }
+  // Embedded data (from Teamleader sync) is always the source of truth.
+  // Excel uploads override for the current session only (not persisted).
+  let DATA = window.SAFESIGHT_DEFAULT;
+  try { localStorage.removeItem(LS.data); } catch (e) {}
 
   let GOALS = {};
   try { GOALS = JSON.parse(localStorage.getItem(LS.goals)) || {}; } catch (e) {}
@@ -597,7 +592,7 @@
     const fi = $('#fileInput');
     $('#uploadBtn').addEventListener('click', () => fi.click());
     fi.addEventListener('change', e => { if (e.target.files[0]) loadFile(e.target.files[0]); });
-    $('#resetBtn').addEventListener('click', () => { localStorage.removeItem(LS.data); DATA = window.SAFESIGHT_DEFAULT; render(); toast('Reverted to original snapshot'); });
+    $('#resetBtn').addEventListener('click', () => { DATA = window.SAFESIGHT_DEFAULT; render(); toast('Reverted to synced data'); });
 
     const drop = $('#drop'); let dc = 0;
     window.addEventListener('dragenter', e => { e.preventDefault(); dc++; drop.classList.add('show'); });
@@ -611,7 +606,7 @@
     try {
       const parsed = await window.SafeSightParser.parseWorkbook(await file.arrayBuffer());
       if (!parsed.deals.length) throw new Error('No dated deals found');
-      DATA = parsed; saveData(); state.year = null; render();
+      DATA = parsed; state.year = null; render();
       toast(`Updated · ${parsed.deals.length} deals loaded`);
     } catch (err) { console.error(err); toast('Could not read file: ' + err.message, true); }
   }
