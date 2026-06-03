@@ -749,6 +749,10 @@ table.deals td.reason { color: var(--ink-dim); max-width: 420px; line-height: 1.
   <!-- Control bar -->
   <div class="controls">
     <div class="select-wrap"><select class="ctl" id="yearSel"></select></div>
+    <div class="seg" id="currencySeg">
+      <button data-cur="eur">€ EUR</button>
+      <button data-cur="usd">$ USD</button>
+    </div>
     <div class="seg" id="granSeg">
       <button data-g="quarter">Quarter</button>
       <button data-g="month">Month</button>
@@ -833,6 +837,14 @@ table.deals td.reason { color: var(--ink-dim); max-width: 420px; line-height: 1.
           <span class="streamtot" id="wonTot"></span>
         </div>
         <div class="lb scrolllist" id="wonList"></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head">
+          <h2>Open deals <span class="subh" id="openSub"></span></h2>
+          <span class="streamtot" id="openTot"></span>
+        </div>
+        <div class="lb scrolllist" id="openList"></div>
       </div>
     </section>
 

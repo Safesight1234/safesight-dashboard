@@ -189,15 +189,26 @@ exports.handler = async () => {
 
     const deals = allDeals.map(d => {
       const customer  = getCustomer(d);
-      const nl_arr    = Math.round(fieldNum(d, cfg.fNL_ARR));
-      const nl_oo     = Math.round(fieldNum(d, cfg.fNL_OO));
-      const nl_ob     = Math.round(fieldNum(d, cfg.fNL_OB));
-      const us_arr    = Math.round(fieldNum(d, cfg.fUS_ARR));
-      const us_oo     = Math.round(fieldNum(d, cfg.fUS_OO));
-      const us_ob     = Math.round(fieldNum(d, cfg.fUS_OB));
-      const vl_rec    = Math.round(fieldNum(d, cfg.fVL_REC));
-      const vl_oo     = Math.round(fieldNum(d, cfg.fVL_OO));
-      const vl_impl   = Math.round(fieldNum(d, cfg.fVL_IMPL));
+      const tyVal     = fieldValue(d, cfg.fType) || '';
+      // Type logic: if "renewal + upsell", show as upsell; if only renewal, show renewal
+      const isRenewalPlus = tyVal.toLowerCase().includes('renewal') && tyVal.toLowerCase().includes('upsell');
+      const isOnlyRenewal = tyVal.toLowerCase().includes('renewal') && !tyVal.toLowerCase().includes('upsell');
+
+      let nl_arr    = Math.round(fieldNum(d, cfg.fNL_ARR));
+      let nl_oo     = Math.round(fieldNum(d, cfg.fNL_OO));
+      let nl_ob     = Math.round(fieldNum(d, cfg.fNL_OB));
+      let us_arr    = Math.round(fieldNum(d, cfg.fUS_ARR));
+      let us_oo     = Math.round(fieldNum(d, cfg.fUS_OO));
+      let us_ob     = Math.round(fieldNum(d, cfg.fUS_OB));
+      let vl_rec    = Math.round(fieldNum(d, cfg.fVL_REC));
+      let vl_oo     = Math.round(fieldNum(d, cfg.fVL_OO));
+      let vl_impl   = Math.round(fieldNum(d, cfg.fVL_IMPL));
+
+      // If "renewal + upsell", move renewal value to upsell
+      if (isRenewalPlus) {
+        us_arr += vl_rec; us_oo += vl_oo; us_ob += vl_impl;
+        vl_rec = 0; vl_oo = 0; vl_impl = 0;
+      }
 
       return {
         t:       d.title || '',
@@ -213,7 +224,7 @@ exports.handler = async () => {
         vl_rec, vl_oo, vl_impl,
         rep:     userMap[d.responsible_user?.id] || '',
         ct:      fieldValue(d, cfg.fCustTy),
-        ty:      fieldValue(d, cfg.fType),
+        ty:      isRenewalPlus ? 'Upsell' : tyVal, // normalize "renewal + upsell" to "Upsell"
         co:      customer.co,
         pi:      getPipeline(d),
         stage:   d.pipeline_stage?.name || '',
@@ -224,7 +235,18 @@ exports.handler = async () => {
     });
 
     const today   = new Date().toISOString().slice(0, 10);
-    const dataset = { generated: today, deals };
+
+    // Fetch EUR to USD exchange rate for today
+    let exchangeRate = 1.1; // default fallback
+    try {
+      const rateRes = await fetch(`https://api.exchangerate-api.com/v4/latest/EUR`);
+      if (rateRes.ok) {
+        const rateData = await rateRes.json();
+        exchangeRate = rateData.rates?.USD || 1.1;
+      }
+    } catch (e) {}
+
+    const dataset = { generated: today, deals, exchangeRate };
 
     // Get current file from GitHub to preserve goals + get SHA
     const currentFile = await githubGetFile(ghRepo, 'project/dashboard/embedded-data.js', ghToken);

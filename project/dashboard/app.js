@@ -21,7 +21,7 @@
   for (const y in SEED) if (!GOALS[y]) GOALS[y] = { nl: SEED[y].nl.slice(), us: SEED[y].us.slice() };
 
   const state = Object.assign(
-    { tab: 'overview', year: null, gran: 'quarter', quarter: 'all', compare: 'none', includeVL: false, rep: 'all', country: 'all' },
+    { tab: 'overview', year: null, gran: 'quarter', quarter: 'all', compare: 'none', includeVL: false, rep: 'all', country: 'all', currency: 'eur' },
     (() => { try { return JSON.parse(localStorage.getItem(LS.state)) || {}; } catch (e) { return {}; } })()
   );
 
@@ -50,12 +50,20 @@
   const isOpen = d => d.status === 'open' || (!d.status && d.d >  TODAY);
 
   function fmtMoney(n) {
-    const a = Math.abs(n);
-    if (a >= 1e6) return '€' + (n / 1e6).toFixed(a >= 1e7 ? 1 : 2).replace(/\.?0+$/, '') + 'M';
-    if (a >= 1000) return '€' + Math.round(n / 1000) + 'k';
-    return '€' + Math.round(n);
+    const rate = (window.SAFESIGHT_DEFAULT?.exchangeRate || 1);
+    const val = state.currency === 'usd' ? n * rate : n;
+    const sym = state.currency === 'usd' ? '$' : '€';
+    const a = Math.abs(val);
+    if (a >= 1e6) return sym + (val / 1e6).toFixed(a >= 1e7 ? 1 : 2).replace(/\.?0+$/, '') + 'M';
+    if (a >= 1000) return sym + Math.round(val / 1000) + 'k';
+    return sym + Math.round(val);
   }
-  function fmtFull(n) { return '€' + Math.round(n).toLocaleString('en-US'); }
+  function fmtFull(n) {
+    const rate = (window.SAFESIGHT_DEFAULT?.exchangeRate || 1);
+    const val = state.currency === 'usd' ? n * rate : n;
+    const sym = state.currency === 'usd' ? '$' : '€';
+    return sym + Math.round(val).toLocaleString('en-US');
+  }
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c])); }
 
   function applyFilters(arr) {
@@ -144,6 +152,7 @@
 
   function renderControls(ys) {
     $('#yearSel').innerHTML = ys.map(y => `<option value="${y}" ${y === state.year ? 'selected' : ''}>${y}</option>`).join('');
+    $$('#currencySeg button').forEach(b => b.classList.toggle('active', b.dataset.cur === state.currency));
     $$('#granSeg button').forEach(b => b.classList.toggle('active', b.dataset.g === state.gran));
     $$('#qSeg button').forEach(b => b.classList.toggle('active', b.dataset.q === String(state.quarter)));
     $('#vlToggle').classList.toggle('active', state.includeVL);
@@ -210,6 +219,7 @@
     renderLeaderboard(y);
     renderTable(y);
     renderWonList(y);
+    renderOpenList(y);
     renderLostDeals(y);
     renderChurn(y);
   }
@@ -346,15 +356,43 @@
     const goalsArr = idxs.map(perGoal);
     const max = Math.max(1, ...vals, ...goalsArr) * 1.1;
     const H = 150;
-    $(sel).innerHTML = `<div class="bars" style="height:${H}px">` + idxs.map(i => {
+
+    // Pre-index deals for stream chart hover
+    const allWon = wonDealsForYear(y);
+    const streamDeals = {};
+    idxs.forEach(i => {
+      const key2 = `${y}-${gran}-${i}-${key}`;
+      streamDeals[key2] = allWon.filter(d => {
+        const idx = gran === 'month' ? monthOf(d.d) : quarterOf(d.d);
+        return idx === i && d[key] > 0;
+      });
+    });
+
+    const wrap = $(sel);
+    wrap.innerHTML = `<div class="bars" style="height:${H}px">` + idxs.map(i => {
       const v = data[i][key], goal = perGoal(i);
-      return `<div class="bar-col">
+      return `<div class="bar-col" data-skey="${y}-${gran}-${i}-${key}">
         <div class="vlab">${fmtMoney(v)}</div>
-        <div class="goal-tick" style="bottom:${(goal / max) * (H - 20) + 20}px" title="Goal ${fmtFull(goal)}"></div>
+        <div class="goal-tick" style="bottom:${(goal / max) * (H - 20) + 20}px"></div>
         <div class="bar-stack" style="height:${Math.max((v / max) * (H - 20), v > 0 ? 3 : 0)}px"><div class="bar-seg ${key}" style="height:100%"></div></div>
         <div class="xlab">${labs[i]}</div>
       </div>`;
     }).join('') + `</div>`;
+
+    // Hover tooltips for stream charts
+    wrap.onmousemove = e => {
+      const col = e.target.closest('[data-skey]'); if (!col) { hideTip(); return; }
+      moveTip(e);
+      const deals = streamDeals[col.dataset.skey] || [];
+      if (!deals.length) { hideTip(); return; }
+      const label = col.querySelector('.xlab')?.textContent || '';
+      const topDeals = deals.slice().sort((a, b) => b[key] - a[key]).slice(0, 10);
+      const rows = topDeals.map(d => `<div style="display:flex;justify-content:space-between;gap:16px"><span>${esc(d.t || d.c)}</span><span style="color:#94a3b8">${fmtMoney(d[key])}</span></div>`).join('');
+      const total = deals.reduce((s, d) => s + d[key], 0);
+      showTip(e, `<div style="font-weight:700;margin-bottom:6px;color:#38bdf8">${label} · ${deals.length} deals · ${fmtMoney(total)}</div>${rows}${deals.length > 10 ? `<div style="color:#64748b;margin-top:4px">+${deals.length - 10} more</div>` : ''}`);
+    };
+    wrap.onmouseleave = hideTip;
+
     const total = vals.reduce((a, b) => a + b, 0);
     const goalTotal = goalsArr.reduce((a, b) => a + b, 0);
     $(totalSel).innerHTML = `${fmtMoney(total)} <span class="ofgoal">/ ${fmtMoney(goalTotal)}</span>`;
@@ -448,6 +486,28 @@
         </div>
       </div>`;
     }).join('') : '<div class="empty">No won deals in selection</div>';
+  }
+
+  function renderOpenList(y) {
+    const openEl = $('#openList'); if (!openEl) return;
+    let arr = openDealsForYear(y);
+    if (state.quarter !== 'all') arr = arr.filter(d => quarterOf(d.d) === +state.quarter);
+    arr = arr.slice().sort((a, b) => (b.nl + b.us + b.vl) - (a.nl + a.us + a.vl));
+    const max = arr.reduce((m, d) => Math.max(m, d.nl + d.us + d.vl), 1);
+    const total = arr.reduce((s, d) => s + d.nl + d.us + d.vl, 0);
+    const sub = $('#openSub'), tot = $('#openTot');
+    if (sub) sub.textContent = arr.length + ' deals';
+    if (tot) tot.textContent = fmtMoney(total);
+    openEl.innerHTML = arr.length ? arr.slice(0, 30).map((d, i) => {
+      const v = d.nl + d.us + d.vl;
+      return `<div class="wrow">
+        <span class="rank">${i + 1}</span>
+        <div class="wrow-main">
+          <div class="wrow-top"><span class="who">${esc(d.t || d.c)}</span>${pipePill(d.pi)}<span class="amt">${fmtMoney(v)}</span></div>
+          <div class="barline"><i style="width:${(v / max) * 100}%"></i></div>
+        </div>
+      </div>`;
+    }).join('') : '<div class="empty">No open deals in selection</div>';
   }
 
   // ---------- PIPELINE TAB ----------
@@ -720,6 +780,7 @@
     $('#coSel').addEventListener('change', e => { state.country = e.target.value; render(); });
     $$('#granSeg button').forEach(b => b.addEventListener('click', () => { state.gran = b.dataset.g; render(); }));
     $$('#qSeg button').forEach(b => b.addEventListener('click', () => { state.quarter = b.dataset.q === 'all' ? 'all' : +b.dataset.q; render(); }));
+    $$('#currencySeg button').forEach(b => b.addEventListener('click', () => { state.currency = b.dataset.cur; render(); }));
     $('#vlToggle').addEventListener('click', () => { state.includeVL = !state.includeVL; render(); });
 
     $('#goalLink').addEventListener('click', openGoals);
