@@ -134,12 +134,18 @@ exports.handler = async () => {
     const userMap   = {};
     (usersResp.data || []).forEach(u => { userMap[u.id] = `${u.first_name} ${u.last_name}`.trim(); });
 
-    // Fetch won + open deals from both pipelines
-    const rawDeals = await tlAll('deals.list', { filter: { pipeline_ids: [cfg.p1, cfg.p2] }, includes: 'custom_fields' }, token);
+    // Fetch all deals from all 3 pipelines (including archived where won deals live)
+    const allPipelineIds = [cfg.p1, cfg.p2, 'e58d4225-8680-0991-874b-ad643412b2c7'].filter(Boolean);
+    const rawDeals = await tlAll('deals.list', { filter: { pipeline_ids: allPipelineIds }, includes: 'custom_fields' }, token);
 
+    // Determine won vs open by presence of won_at (more reliable than status string)
     const allDeals = rawDeals
-      .map(d => ({ ...d, _date: d.status === 'won' ? d.won_at : d.estimated_closing_date }))
-      .filter(d => (d.status === 'won' || d.status === 'open') && d._date);
+      .map(d => ({
+        ...d,
+        _isWon: !!d.won_at,
+        _date:  d.won_at || d.estimated_closing_date,
+      }))
+      .filter(d => d._date); // skip deals with no date at all
 
     // Resolve company/contact names + country
     const companyIds = [...new Set(allDeals.filter(d => d.lead?.customer?.type === 'company').map(d => d.lead.customer.id))];
@@ -191,7 +197,7 @@ exports.handler = async () => {
         ty:      fieldValue(d, cfg.fType),
         co:      customer.co,
         pi:      getPipeline(d),
-        status:  d.status || '',
+        status:  d._isWon ? 'won' : 'open',
         prob:    d.estimated_probability ?? null,
       };
     });
