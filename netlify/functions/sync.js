@@ -138,14 +138,15 @@ exports.handler = async () => {
     const allPipelineIds = [cfg.p1, cfg.p2, 'e58d4225-8680-0991-874b-ad643412b2c7'].filter(Boolean);
     const rawDeals = await tlAll('deals.list', { filter: { pipeline_ids: allPipelineIds }, includes: 'custom_fields' }, token);
 
-    // Determine won vs open by presence of won_at (more reliable than status string)
+    // Determine won vs open/lost by dates (more reliable than status string)
     const allDeals = rawDeals
       .map(d => ({
         ...d,
-        _isWon: !!d.won_at,
-        _date:  d.won_at || d.estimated_closing_date,
+        _isWon:  !!d.won_at,
+        _isLost: !!(d.lost_at || d.refused_at),
+        _date:   d.won_at || d.estimated_closing_date,
       }))
-      .filter(d => d._date); // skip deals with no date at all
+      .filter(d => d._date && !d._isLost); // skip lost and dateless deals
 
     // Resolve company/contact names + country
     const companyIds = [...new Set(allDeals.filter(d => d.lead?.customer?.type === 'company').map(d => d.lead.customer.id))];
