@@ -21,7 +21,7 @@
   for (const y in SEED) if (!GOALS[y]) GOALS[y] = { nl: SEED[y].nl.slice(), us: SEED[y].us.slice() };
 
   const state = Object.assign(
-    { tab: 'overview', year: null, gran: 'quarter', quarter: 'all', compare: 'none', includeVL: false, rep: 'all', country: 'all', currency: 'eur' },
+    { tab: 'overview', year: null, gran: 'quarter', quarter: 'all', compare: 'none', includeVL: false, rep: 'all', country: 'all', currency: 'eur', theme: 'dark' },
     (() => { try { return JSON.parse(localStorage.getItem(LS.state)) || {}; } catch (e) { return {}; } })()
   );
 
@@ -50,7 +50,7 @@
   const isOpen = d => d.status === 'open' || (!d.status && d.d >  TODAY);
 
   function fmtMoney(n) {
-    const rate = (window.SAFESIGHT_DEFAULT?.exchangeRate || 1);
+    const rate = (window.SAFESIGHT_DEFAULT?.exchangeRate || 1.08);
     const val = state.currency === 'usd' ? n * rate : n;
     const sym = state.currency === 'usd' ? '$' : '€';
     const a = Math.abs(val);
@@ -59,7 +59,7 @@
     return sym + Math.round(val);
   }
   function fmtFull(n) {
-    const rate = (window.SAFESIGHT_DEFAULT?.exchangeRate || 1);
+    const rate = (window.SAFESIGHT_DEFAULT?.exchangeRate || 1.08);
     const val = state.currency === 'usd' ? n * rate : n;
     const sym = state.currency === 'usd' ? '$' : '€';
     return sym + Math.round(val).toLocaleString('en-US');
@@ -772,6 +772,31 @@
   function persist() { try { localStorage.setItem(LS.state, JSON.stringify(state)); localStorage.setItem(LS.goals, JSON.stringify(GOALS)); } catch (e) {} }
   function saveData() { try { localStorage.setItem(LS.data, JSON.stringify(DATA)); } catch (e) {} }
 
+  function applyTheme() {
+    const root = document.documentElement;
+    if (state.theme === 'light') {
+      root.style.setProperty('--bg', '#fafafa');
+      root.style.setProperty('--bg-2', '#f5f5f5');
+      root.style.setProperty('--panel', '#fff');
+      root.style.setProperty('--panel-2', '#f9f9f9');
+      root.style.setProperty('--ink', '#1a1a1a');
+      root.style.setProperty('--ink-dim', '#505050');
+      root.style.setProperty('--ink-faint', '#888');
+      root.style.setProperty('--line', '#e5e5e5');
+      root.style.setProperty('--line-strong', '#d0d0d0');
+    } else {
+      root.style.setProperty('--bg', '#0f1419');
+      root.style.setProperty('--bg-2', '#1a202c');
+      root.style.setProperty('--panel', '#1e293b');
+      root.style.setProperty('--panel-2', '#2a3a52');
+      root.style.setProperty('--ink', '#e2e8f0');
+      root.style.setProperty('--ink-dim', '#cbd5e1');
+      root.style.setProperty('--ink-faint', '#94a3b8');
+      root.style.setProperty('--line', '#334155');
+      root.style.setProperty('--line-strong', '#475569');
+    }
+  }
+
   function bind() {
     $$('.tabbtn').forEach(b => b.addEventListener('click', () => { state.tab = b.dataset.tab; render(); }));
     $('#yearSel').addEventListener('change', e => { state.year = +e.target.value; render(); });
@@ -782,6 +807,7 @@
     $$('#qSeg button').forEach(b => b.addEventListener('click', () => { state.quarter = b.dataset.q === 'all' ? 'all' : +b.dataset.q; render(); }));
     $$('#currencySeg button').forEach(b => b.addEventListener('click', () => { state.currency = b.dataset.cur; render(); }));
     $('#vlToggle').addEventListener('click', () => { state.includeVL = !state.includeVL; render(); });
+    $('#themeToggle').addEventListener('click', () => { state.theme = state.theme === 'dark' ? 'light' : 'dark'; persist(); applyTheme(); });
 
     $('#goalLink').addEventListener('click', openGoals);
     $('#goalsBtn').addEventListener('click', openGoals);
@@ -817,5 +843,5 @@
     clearTimeout(toastT); toastT = setTimeout(() => t.className = 'toast' + (isErr ? ' err' : ''), 3200);
   }
 
-  document.addEventListener('DOMContentLoaded', () => { bind(); render(); });
+  document.addEventListener('DOMContentLoaded', () => { applyTheme(); bind(); render(); });
 })();
