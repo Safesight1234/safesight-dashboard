@@ -134,9 +134,12 @@ exports.handler = async () => {
     const userMap   = {};
     (usersResp.data || []).forEach(u => { userMap[u.id] = `${u.first_name} ${u.last_name}`.trim(); });
 
-    // Fetch all deals from all 3 pipelines (including archived where won deals live)
-    const allPipelineIds = [cfg.p1, cfg.p2, 'e58d4225-8680-0991-874b-ad643412b2c7'].filter(Boolean);
-    const rawDeals = await tlAll('deals.list', { filter: { pipeline_ids: allPipelineIds }, includes: 'custom_fields' }, token);
+    // Fetch open and won deals separately (API requires explicit status filter)
+    const [rawOpen, rawWon] = await Promise.all([
+      tlAll('deals.list', { filter: { pipeline_ids: [cfg.p1, cfg.p2], status: ['open'] }, includes: 'custom_fields' }, token),
+      tlAll('deals.list', { filter: { pipeline_ids: [cfg.p1, cfg.p2], status: ['won']  }, includes: 'custom_fields' }, token),
+    ]);
+    const rawDeals = [...rawOpen, ...rawWon];
 
     // Determine won vs open/lost by dates (more reliable than status string)
     const allDeals = rawDeals
