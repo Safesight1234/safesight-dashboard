@@ -1,56 +1,7 @@
-const https = require('https');
+const { getAccessToken, httpsPost } = require('./lib/tl-auth');
 
 async function tlPost(endpoint, body, token) {
-  return new Promise((resolve, reject) => {
-    const data = JSON.stringify(body);
-    const req  = https.request({
-      hostname: 'api.focus.teamleader.eu', port: 443, path: `/${endpoint}`,
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Content-Length': Buffer.byteLength(data),
-        'Authorization': `Bearer ${token}`,
-      },
-    }, res => {
-      let raw = '';
-      res.on('data', c => raw += c);
-      res.on('end', () => {
-        const json = JSON.parse(raw);
-        if (res.statusCode >= 400) reject(new Error(JSON.stringify(json)));
-        else resolve(json);
-      });
-    });
-    req.on('error', reject);
-    req.write(data);
-    req.end();
-  });
-}
-
-async function refreshAccessToken() {
-  return new Promise((resolve, reject) => {
-    const body = JSON.stringify({
-      grant_type:    'refresh_token',
-      client_id:     process.env.TL_CLIENT_ID,
-      client_secret: process.env.TL_CLIENT_SECRET,
-      refresh_token: process.env.TL_REFRESH_TOKEN,
-    });
-    const req = https.request({
-      hostname: 'focus.teamleader.eu', port: 443, path: '/oauth2/access_token',
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) },
-    }, res => {
-      let raw = '';
-      res.on('data', c => raw += c);
-      res.on('end', () => {
-        const json = JSON.parse(raw);
-        if (json.error || !json.access_token) reject(new Error(`Token refresh failed: ${json.error_description || json.error || raw}`));
-        else resolve(json.access_token);
-      });
-    });
-    req.on('error', reject);
-    req.write(body);
-    req.end();
-  });
+  return httpsPost('api.focus.teamleader.eu', `/${endpoint}`, body, { Authorization: `Bearer ${token}` });
 }
 
 exports.handler = async () => {
@@ -66,7 +17,7 @@ exports.handler = async () => {
   }
 
   try {
-    const token = await refreshAccessToken();
+    const token = await getAccessToken();
 
     const [pipelines, fields, users] = await Promise.all([
       tlPost('dealPipelines.list', {}, token),

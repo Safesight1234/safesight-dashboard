@@ -1,4 +1,5 @@
 const https = require('https');
+const { getAccessToken, httpsPost } = require('./lib/tl-auth');
 
 // ─── HTTP helpers ──────────────────────────────────────────────────────────
 function request(method, hostname, path, body, headers) {
@@ -29,22 +30,8 @@ function request(method, hostname, path, body, headers) {
   });
 }
 
-// ─── Teamleader API ────────────────────────────────────────────────────────
-async function getAccessToken() {
-  const r = await request('POST', 'focus.teamleader.eu', '/oauth2/access_token', {
-    grant_type:    'refresh_token',
-    client_id:     process.env.TL_CLIENT_ID,
-    client_secret: process.env.TL_CLIENT_SECRET,
-    refresh_token: process.env.TL_REFRESH_TOKEN,
-  }, {});
-  return r.json.access_token;
-}
-
 async function tlPost(endpoint, body, token) {
-  const r = await request('POST', 'api.focus.teamleader.eu', `/${endpoint}`, body, {
-    Authorization: `Bearer ${token}`,
-  });
-  return r.json;
+  return httpsPost('api.focus.teamleader.eu', `/${endpoint}`, body, { Authorization: `Bearer ${token}` });
 }
 
 async function tlAll(endpoint, filterBody, token) {

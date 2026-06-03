@@ -1,4 +1,5 @@
 const https = require('https');
+const { persistRefreshToken } = require('./lib/tl-auth');
 
 function post(url, body) {
   return new Promise((resolve, reject) => {
@@ -19,16 +20,26 @@ function post(url, body) {
   });
 }
 
+const html = (title, color, body) => `<!DOCTYPE html>
+<html><head><title>${title}</title>
+<style>
+  body{font-family:system-ui;max-width:560px;margin:80px auto;padding:20px;background:#0e1116;color:#edf1f6}
+  h1{color:${color}} p{color:#aeb7c4;line-height:1.6}
+  a{color:#60a5fa} .box{background:#141921;border-radius:10px;padding:20px;margin:16px 0}
+</style></head><body>${body}</body></html>`;
+
 exports.handler = async (event) => {
   const { code, error } = event.queryStringParameters || {};
-  const siteUrl    = process.env.URL;
+  const siteUrl     = process.env.URL;
   const redirectUri = `${siteUrl}/.netlify/functions/auth-callback`;
 
   if (error) {
-    return { statusCode: 400, body: `Teamleader returned an error: ${error}` };
+    return { statusCode: 400, headers: { 'Content-Type': 'text/html' },
+      body: html('Error', '#f87171', `<h1>Connection failed</h1><p>${error}</p>`) };
   }
   if (!code) {
-    return { statusCode: 400, body: 'No authorization code received.' };
+    return { statusCode: 400, headers: { 'Content-Type': 'text/html' },
+      body: html('Error', '#f87171', `<h1>No code received</h1><p>Try connecting again.</p>`) };
   }
 
   try {
@@ -40,48 +51,26 @@ exports.handler = async (event) => {
       redirect_uri:  redirectUri,
     });
 
-    const refresh = tokens.refresh_token;
+    if (!tokens.refresh_token) throw new Error('No refresh token in response');
+
+    // Auto-save refresh token to Netlify env vars + trigger redeploy
+    await persistRefreshToken(tokens.refresh_token);
 
     return {
       statusCode: 200,
       headers: { 'Content-Type': 'text/html' },
-      body: `<!DOCTYPE html>
-<html>
-<head><title>Connected!</title>
-<style>
-  body { font-family: system-ui; max-width: 640px; margin: 60px auto; padding: 20px; background: #0e1116; color: #edf1f6; }
-  h1 { color: #34d399; }
-  .token { background: #1e2530; border: 1px solid #34d399; border-radius: 8px; padding: 16px; word-break: break-all; font-family: monospace; font-size: 14px; margin: 16px 0; }
-  .step { background: #141921; border-radius: 8px; padding: 16px; margin: 12px 0; }
-  .step b { color: #34d399; }
-  p { color: #aeb7c4; line-height: 1.6; }
-</style>
-</head>
-<body>
-<h1>✓ Connected to Teamleader!</h1>
-<p>Copy the refresh token below and add it to your Netlify environment variables.</p>
-<div class="token">${refresh}</div>
-
-<div class="step">
-  <b>Step 1:</b> Go to your <a href="https://app.netlify.com" style="color:#60a5fa">Netlify dashboard</a>
-  → your site → <b>Site configuration → Environment variables</b>
-</div>
-<div class="step">
-  <b>Step 2:</b> Add a new variable:<br>
-  Key: <code>TL_REFRESH_TOKEN</code><br>
-  Value: (paste the token above)
-</div>
-<div class="step">
-  <b>Step 3:</b> Click <b>Save</b>, then go to <b>Deploys → Trigger deploy</b> to redeploy with the new variable.
-</div>
-<div class="step">
-  <b>Step 4:</b> After redeploying, visit <a href="/.netlify/functions/setup" style="color:#60a5fa">/.netlify/functions/setup</a>
-  to find your pipeline and field IDs.
-</div>
-</body>
-</html>`,
+      body: html('Connected!', '#34d399', `
+        <h1>✓ Connected to Teamleader!</h1>
+        <p>The refresh token has been saved automatically. A new deploy has been triggered (~1 minute).</p>
+        <div class="box">
+          Once the deploy finishes, visit
+          <a href="/.netlify/functions/setup">/.netlify/functions/setup</a>
+          to find your pipeline and field IDs.
+        </div>
+      `),
     };
   } catch (err) {
-    return { statusCode: 500, body: `Token exchange failed: ${err.message}` };
+    return { statusCode: 500, headers: { 'Content-Type': 'text/html' },
+      body: html('Error', '#f87171', `<h1>Connection failed</h1><p>${err.message}</p>`) };
   }
 };
