@@ -594,7 +594,7 @@
 
     // To close current month (high probability deals closing this month, with value)
     const currentMonth = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0');
-    const closeThisMonth = scoped.filter(d => d.d.startsWith(currentMonth) && (d.prob || 0) >= 0.5 && (d.nl + d.us) > 0).slice().sort((a, b) => (b.nl + b.us) - (a.nl + a.us));
+    const closeThisMonth = scoped.filter(d => d.d.startsWith(currentMonth) && (d.prob || 0) >= 0.5 && (d.nl + d.us) > 0).slice().sort((a, b) => (b.prob || 0) - (a.prob || 0));
     const closeEl = $('#closeMonthList');
     if (closeEl) {
       const tot = $('#closeMonthTot');
