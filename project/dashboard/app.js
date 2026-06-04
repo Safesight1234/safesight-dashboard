@@ -584,15 +584,17 @@
       const tot = $('#closeMonthTot');
       const closeTotal = closeThisMonth.reduce((s, d) => s + d.nl + d.us, 0);
       if (tot) tot.textContent = fmtMoney(closeTotal);
-      closeEl.innerHTML = closeThisMonth.length ? closeThisMonth.map(d => {
+      closeEl.innerHTML = closeThisMonth.length ? closeThisMonth.map((d, i) => {
         const amt = d.nl + d.us;
-        return `<div class="wrow">
-          <div class="wrow-main">
-            <div class="wrow-top"><span class="who">${esc(d.t || d.c)}</span><span class="amt">${fmtMoney(amt)}</span></div>
-            <div class="submeta">${esc(d.rep || '')} · ${d.prob ? Math.round(d.prob * 100) : 0}% prob</div>
+        const prob = d.prob ? Math.round(d.prob * 100) : 0;
+        return `<div style="padding:10px;border-bottom:1px solid var(--line-faint);display:flex;justify-content:space-between;align-items:center">
+          <div style="flex:1;min-width:0">
+            <div style="font-weight:600;font-size:13px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(d.t || d.c)}</div>
+            <div style="font-size:11px;color:var(--ink-faint);margin-top:2px">${esc(d.rep || '—')} · ${prob}%</div>
           </div>
+          <div style="font-weight:700;font-size:12px;margin-left:8px;white-space:nowrap">${fmtMoney(amt)}</div>
         </div>`;
-      }).join('') : '<div class="empty" style="padding:20px;text-align:center">No high probability deals closing this month</div>';
+      }).join('') : '<div style="padding:20px;text-align:center;color:var(--ink-faint);font-size:12px">No high probability deals closing this month</div>';
     }
 
     // All open deals (New Logo + Upsell, excluding $0 values)
@@ -698,29 +700,53 @@
       const totalVal = stages.reduce((s, st) => s + st.value, 0);
       const totalWeighted = stages.reduce((s, st) => s + st.weighted, 0);
 
+      const stageIds = stages.map((_, i) => `stage-${i}`);
       funnelEl.innerHTML = `
         <div class="pfunnel">
           <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:12px">
             <h3 style="font-size:16px;font-weight:700;color:var(--ink)">New logo funnel</h3>
             <div style="font-size:14px;color:var(--ink-dim)">${fmtMoney(totalVal)} / ${fmtMoney(totalWeighted)} weighted</div>
           </div>
-          ${stages.map(s => `
-            <div style="margin-bottom:16px">
-              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-                <div style="display:flex;align-items:center;gap:8px">
-                  <span style="font-weight:600;color:var(--ink)">${esc(s.name)}</span>
-                  <span style="font-size:12px;color:var(--good);font-weight:700">${s.prob}%</span>
+          ${stages.map((s, idx) => `
+            <div style="margin-bottom:12px;border:1px solid var(--line);border-radius:6px;overflow:hidden">
+              <div style="padding:10px;background:var(--bg-2);cursor:pointer" class="stage-header" data-stage="${idx}">
+                <div style="display:flex;justify-content:space-between;align-items:center">
+                  <div style="display:flex;align-items:center;gap:8px;flex:1">
+                    <span style="font-weight:700;font-size:13px;color:var(--ink)">${esc(s.name)}</span>
+                    <span style="font-size:11px;color:var(--good);font-weight:700;background:var(--good-bg);padding:2px 6px;border-radius:3px">${s.prob}%</span>
+                    <span style="font-size:11px;color:var(--ink-faint)">${s.count} deals</span>
+                  </div>
+                  <div style="display:flex;align-items:center;gap:8px">
+                    <span style="font-weight:700;font-size:13px">${fmtMoney(s.value)}</span>
+                    <span style="color:var(--ink-faint);font-size:16px">▼</span>
+                  </div>
                 </div>
-                <span style="font-weight:700;color:var(--ink)">${fmtMoney(s.value)}</span>
               </div>
-              <div style="background:var(--line);height:6px;border-radius:3px;overflow:hidden;margin-bottom:4px">
-                <div style="height:100%;background:var(--newlogo);width:${(s.value/maxVal)*100}%"></div>
+              <div style="background:var(--line);height:3px;width:${(s.value/maxVal)*100}%"></div>
+              <div class="stage-deals" style="display:none;padding:8px;border-top:1px solid var(--line);max-height:200px;overflow-y:auto">
+                ${s.deals.map(d => `
+                  <div style="padding:6px;font-size:11px;border-bottom:1px solid var(--line-faint)">
+                    <div style="font-weight:600;color:var(--ink)">${esc(d.t || d.c)}</div>
+                    <div style="color:var(--ink-faint);margin-top:2px">${esc(d.rep || '—')} · ${fmtMoney(d.nl)}</div>
+                  </div>
+                `).join('')}
               </div>
-              <div style="font-size:11px;color:var(--ink-faint)">${s.count} deal${s.count !== 1 ? 's' : ''} · ${fmtMoney(s.weighted)} weighted</div>
             </div>
           `).join('')}
         </div>
       `;
+
+      // Add click handlers for expanding/collapsing stages
+      funnelEl.querySelectorAll('.stage-header').forEach(header => {
+        header.addEventListener('click', function() {
+          const deals = this.nextElementSibling.nextElementSibling;
+          if (deals) {
+            deals.style.display = deals.style.display === 'none' ? 'block' : 'none';
+            const arrow = this.querySelector('[style*="▼"]');
+            if (arrow) arrow.style.transform = deals.style.display === 'none' ? 'rotate(0deg)' : 'rotate(180deg)';
+          }
+        });
+      });
     }
   }
 
