@@ -784,7 +784,7 @@
     };
 
     const renderHistTable = (bodyId, historical) => {
-      const body = $(bodyId); if (!body) return;
+      const body = $(`#${bodyId}`); if (!body) return;
       const rows = [];
       let totals = { 2023: 0, 2024: 0, 2025: 0, 2026: 0 };
 
@@ -844,7 +844,7 @@
     renderHistTable('histUSBody', historicalUS);
 
     // Combined (NL + US)
-    const combBody = $('#histCombBody'); if (combBody) {
+    const combBody = $(`#histCombBody`); if (combBody) {
       const rows = [];
       let totals = { 2023: 0, 2024: 0, 2025: 0, 2026: 0 };
 
@@ -943,7 +943,7 @@
     };
 
     const renderFinTable = (bodyId, historical) => {
-      const body = $(bodyId); if (!body) return;
+      const body = $(`#${bodyId}`); if (!body) return;
       const rows = [];
       let totals = { 2023: 0, 2024: 0, 2025: 0, 2026: 0 };
 
@@ -988,7 +988,7 @@
     renderFinTable('finUSBody', historicalUS);
 
     // YTD (combined NL + US)
-    const combBody = $('#finYTDBody'); if (combBody) {
+    const combBody = $(`#finYTDBody`); if (combBody) {
       const rows = [];
       let totals = { 2023: 0, 2024: 0, 2025: 0, 2026: 0 };
 
