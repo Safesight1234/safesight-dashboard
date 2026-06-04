@@ -534,11 +534,12 @@
     if (tot) tot.textContent = fmtMoney(total);
     openEl.innerHTML = arr.length ? arr.slice(0, 30).map((d, i) => {
       const v = d.nl + d.us;
+      const prob = d.prob ? Math.round(d.prob * 100) : 0;
       return `<div class="wrow">
         <span class="rank">${i + 1}</span>
         <div class="wrow-main">
           <div class="wrow-top"><span class="who">${esc(d.t || d.c)}</span>${pipePill(d.pi)}<span class="amt">${fmtMoney(v)}</span></div>
-          <div class="barline"><i style="width:${(v / max) * 100}%"></i></div>
+          <div class="barline"><i style="width:${prob}%"></i></div>
         </div>
       </div>`;
     }).join('') : '<div class="empty">No open deals in selection</div>';
