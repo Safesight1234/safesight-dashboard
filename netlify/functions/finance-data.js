@@ -73,8 +73,8 @@ exports.handler = async (event) => {
         const rev = parseMoney(row[4]);
         if (label) {
           churnTotal += rev; churnCount++;
-          // Try multiple column positions for "when" (month)
-          const when = (row[5] || row[6] || '').trim();
+          // Get month from column G
+          const when = (row[6] || '').trim();
           churnRowsOut.push({
             customer: label,
             industry: (row[2] || '').trim(),

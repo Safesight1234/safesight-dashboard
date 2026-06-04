@@ -759,20 +759,14 @@
         totals[2026] += v2026;
       }
 
-      // Add Total row
-      const totalDiff = totals[2026] - totals[2025];
-      const totalDiffPct = totals[2025] > 0 && totals[2026] > 0 ? ((totalDiff / totals[2025]) * 100).toFixed(0) : '';
-      const totalDiffColor = totalDiff >= 0 ? 'var(--good)' : 'var(--bad)';
-      const totalDiffSign = totalDiff >= 0 ? '+' : '';
-      const totalDiffDisplay = totals[2026] > 0 ? `${totalDiffSign}${fmtFull(totalDiff)} (${totalDiffSign}${totalDiffPct}%)` : '—';
-
+      // Add Total row - no year-over-year comparison
       rows.push(`<tr style="background:var(--line-strong);font-weight:700;border-top:2px solid var(--line)">
         <td>Total</td>
         <td class="amt">${fmtFull(totals[2023])}</td>
         <td class="amt">${fmtFull(totals[2024])}</td>
         <td class="amt">${fmtFull(totals[2025])}</td>
         <td class="amt">${fmtFull(totals[2026])}</td>
-        <td class="amt" style="color:${totalDiffColor}">${totalDiffDisplay}</td>
+        <td class="amt">—</td>
       </tr>`);
 
       body.innerHTML = rows.join('');
@@ -817,18 +811,13 @@
         totals[2026] += v2026;
       }
 
-      const totalDiff = totals[2026] - totals[2025];
-      const totalDiffPct = totals[2025] > 0 ? ((totalDiff / totals[2025]) * 100).toFixed(0) : 0;
-      const totalDiffColor = totalDiff >= 0 ? 'var(--good)' : 'var(--bad)';
-      const totalDiffSign = totalDiff >= 0 ? '+' : '';
-
       rows.push(`<tr style="background:var(--line-strong);font-weight:700;border-top:2px solid var(--line)">
         <td>Total</td>
         <td class="amt">${fmtFull(totals[2023])}</td>
         <td class="amt">${fmtFull(totals[2024])}</td>
         <td class="amt">${fmtFull(totals[2025])}</td>
         <td class="amt">${fmtFull(totals[2026])}</td>
-        <td class="amt" style="color:${totalDiffColor}">${totalDiffSign}${fmtFull(totalDiff)} (${totalDiffSign}${totalDiffPct}%)</td>
+        <td class="amt">—</td>
       </tr>`);
 
       combBody.innerHTML = rows.join('');
@@ -1083,5 +1072,35 @@
     clearTimeout(toastT); toastT = setTimeout(() => t.className = 'toast' + (isErr ? ' err' : ''), 3200);
   }
 
-  document.addEventListener('DOMContentLoaded', () => { applyTheme(); bind(); render(); });
+  // Login
+  window.handleLogin = function(event) {
+    event.preventDefault();
+    const pw = document.getElementById('passwordInput').value;
+    if (pw === 'Safesight@2026!') {
+      if (document.getElementById('rememberMe').checked) localStorage.setItem('safesight.auth', '1');
+      sessionStorage.setItem('safesight.auth', '1');
+      document.getElementById('loginScreen').style.display = 'none';
+    } else {
+      document.getElementById('loginError').textContent = 'Invalid password';
+      document.getElementById('passwordInput').value = '';
+    }
+  };
+
+  window.resetFilters = function() {
+    state.quarter = 'all';
+    state.rep = 'all';
+    state.gran = 'quarter';
+    state.compare = 'none';
+    render();
+  };
+
+  function checkAuth() {
+    if (localStorage.getItem('safesight.auth') === '1' || sessionStorage.getItem('safesight.auth') === '1') {
+      document.getElementById('loginScreen').style.display = 'none';
+    } else {
+      document.getElementById('loginScreen').style.display = 'flex';
+    }
+  }
+
+  document.addEventListener('DOMContentLoaded', () => { checkAuth(); applyTheme(); bind(); render(); });
 })();

@@ -185,6 +185,14 @@
   src: url("7bd6e234-0cda-4c9b-a986-035d75035d6b") format('woff2');
   unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
+.login-overlay { position: fixed; inset: 0; background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); display: flex; align-items: center; justify-content: center; z-index: 10000; }
+.login-modal { max-width: 340px; width: 100%; padding: 20px; }
+.login-content { background: #1e293b; border-radius: 12px; padding: 40px; text-align: center; box-shadow: 0 20px 60px rgba(0,0,0,0.3); border: 1px solid #334155; }
+.login-content h2 { margin: 0 0 8px 0; font-size: 24px; font-weight: 700; color: #e2e8f0; }
+.login-content p { margin: 0 0 24px 0; font-size: 14px; color: #94a3b8; }
+#loginForm { display: flex; flex-direction: column; gap: 12px; }
+#passwordInput { padding: 10px 14px; border: 1px solid #475569; border-radius: 8px; background: #0f172a; color: #e2e8f0; font-family: inherit; font-size: 14px; }
+#passwordInput:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1); }
 </style>
 <style>:root {
   --bg: #0E1116;
@@ -710,6 +718,22 @@ table.deals td.reason { color: var(--ink-dim); max-width: 420px; line-height: 1.
 </head>
 <body>
 
+<!-- Login Screen -->
+<div id="loginScreen" class="login-overlay" style="display:none">
+  <div class="login-modal">
+    <div class="login-content">
+      <h2>SafeSight Dashboard</h2>
+      <p>Enter password to access</p>
+      <form id="loginForm" onsubmit="handleLogin(event)">
+        <input type="password" id="passwordInput" placeholder="Password" autocomplete="off" required>
+        <label style="font-size:13px"><input type="checkbox" id="rememberMe"> Remember me</label>
+        <button type="submit" class="btn">Sign In</button>
+        <div id="loginError" style="color:#ef4444;font-size:13px;margin-top:8px"></div>
+      </form>
+    </div>
+  </div>
+</div>
+
 <div class="wrap" data-screen-label="Sales Dashboard">
 
   <!-- Header -->
@@ -747,6 +771,9 @@ table.deals td.reason { color: var(--ink-dim); max-width: 420px; line-height: 1.
       </button>
       <button class="btn ghost" id="themeToggle" title="Toggle dark/light mode">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
+      </button>
+      <button class="btn ghost" onclick="resetFilters()" title="Reset all filters">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M3 21v-5h5"/></svg>
       </button>
       <input type="file" id="fileInput" accept=".xlsx" class="hidden">
     </div>
