@@ -952,57 +952,31 @@ table.deals td.reason { color: var(--ink-dim); max-width: 420px; line-height: 1.
 
   <!-- ============ FINANCIALS TAB ============ -->
   <div id="tab-financials" class="hidden" data-screen-label="Financials">
-    <div class="pipe-note">Company year-to-date. <b>Sales</b> figures are calculated from the pipeline export (won deals); <b>ARR &amp; revenue</b> figures are pulled live from the finance sheet. <b id="finAsOf"></b></div>
+    <div style="display:flex;flex-direction:column;gap:20px;padding:0 2px">
+      <div class="panel">
+        <h2 style="margin-bottom:16px">New logo</h2>
+        <table class="deals compact" style="width:100%;font-size:12px">
+          <thead><tr><th>Quarter</th><th style="text-align:right">2023</th><th style="text-align:right">2024</th><th style="text-align:right">2025</th><th style="text-align:right">2026</th></tr></thead>
+          <tbody id="finNLBody"></tbody>
+        </table>
+      </div>
 
-    <!-- YTD sales (from deals) -->
-    <section class="kpis">
-      <div class="panel kpi hero">
-        <div class="ptitle">Total sales · YTD <span id="finYear"></span></div>
-        <div class="big" id="finSales">—</div>
-        <div class="progress">
-          <div class="ptrack"><div class="pfill" id="finPfill" style="width:0"></div></div>
-          <div class="pmeta">
-            <span class="pct" id="finPct">0%</span>
-            <span class="goal" id="finDeals"></span>
-          </div>
-          <div class="pmeta"><span class="goal" id="finGoalNote"></span></div>
-        </div>
+      <div class="panel">
+        <h2 style="margin-bottom:16px">Upsell</h2>
+        <table class="deals compact" style="width:100%;font-size:12px">
+          <thead><tr><th>Quarter</th><th style="text-align:right">2023</th><th style="text-align:right">2024</th><th style="text-align:right">2025</th><th style="text-align:right">2026</th></tr></thead>
+          <tbody id="finUSBody"></tbody>
+        </table>
       </div>
-      <div class="panel kpi">
-        <div class="ptitle"><span class="dot nl"></span> New logo</div>
-        <div class="big" id="finNL">—</div>
-        <div class="meta"><span class="submeta" id="finNLMeta"></span></div>
-      </div>
-      <div class="panel kpi">
-        <div class="ptitle"><span class="dot us"></span> Upsell</div>
-        <div class="big" id="finUS">—</div>
-        <div class="meta"><span class="submeta" id="finUSMeta"></span></div>
-      </div>
-      <div class="panel kpi">
-        <div class="ptitle"><span class="dot vl"></span> Renewal</div>
-        <div class="big" id="finVL">—</div>
-        <div class="meta"><span class="submeta">won YTD</span></div>
-      </div>
-    </section>
 
-    <!-- Finance headline figures (from sheet) -->
-    <section class="grid-fin">
-      <div class="panel kpi fin">
-        <div class="ptitle">ARR — Total</div>
-        <div class="big" id="finARR">—</div>
-        <div class="meta"><span class="submeta">Annual recurring revenue · annual + event-based licenses</span></div>
+      <div class="panel">
+        <h2 style="margin-bottom:16px">YTD (NL + US)</h2>
+        <table class="deals compact" style="width:100%;font-size:12px">
+          <thead><tr><th>Quarter</th><th style="text-align:right">2023</th><th style="text-align:right">2024</th><th style="text-align:right">2025</th><th style="text-align:right">2026</th></tr></thead>
+          <tbody id="finYTDBody"></tbody>
+        </table>
       </div>
-      <div class="panel kpi fin accent">
-        <div class="ptitle">Total Safesight (75%)</div>
-        <div class="big" id="finTotal75">—</div>
-        <div class="meta"><span class="submeta">Weighted company total, per finance</span></div>
-      </div>
-      <div class="panel kpi fin churn">
-        <div class="ptitle"><span class="dot ch"></span> Churn — Total</div>
-        <div class="big" id="finChurnTotal">—</div>
-        <div class="meta"><span class="submeta" id="finChurnTotalMeta">Lost ARR</span></div>
-      </div>
-    </section>
+    </div>
   </div>
 
   <!-- HISTORICALS TAB -->

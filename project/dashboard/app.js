@@ -641,11 +641,11 @@
     const usWithValue = usDeals.filter(d => d.us > 0);
     const usSorted = usWithValue.slice().sort((a, b) => b.us - a.us);
     const usMax = usSorted.length ? usSorted[0].us : 1;
-    const usTotal = usSorted.reduce((s, d) => s + d.us, 0);
+    const usSortedTotal = usSorted.reduce((s, d) => s + d.us, 0);
     const usEl = $('#pipeReps');
     if (usEl) {
       const tot = $('#pipeRepsTot');
-      if (tot) tot.textContent = fmtMoney(usTotal);
+      if (tot) tot.textContent = fmtMoney(usSortedTotal);
       usEl.innerHTML = usSorted.length ? usSorted.map((d, i) => {
         const prob = d.prob ? Math.round(d.prob * 100) : 0;
         return `<div class="wrow">
@@ -795,15 +795,15 @@
         const v2024 = historical[qLabel]?.[2024] || 0;
         const v2025 = historical[qLabel]?.[2025] || 0;
 
-        // Get 2026 from current deals (all quarters for historicals overview)
+        // Get 2026 from current deals - use combined NL+US for all tables
         const deals2026 = wonDealsForYear(state.year).filter(d => quarterOf(d.d) === q);
-        const key = bodyId === 'histNLBody' ? 'nl' : 'us';
-        const v2026 = sum(deals2026, key);
+        const v2026 = sum(deals2026, 'nl') + sum(deals2026, 'us');
 
         const diff = v2026 - v2025;
-        const diffPct = v2025 > 0 ? ((diff / v2025) * 100).toFixed(0) : 0;
+        const diffPct = v2025 > 0 && v2026 > 0 ? ((diff / v2025) * 100).toFixed(0) : '';
         const diffColor = diff >= 0 ? 'var(--good)' : 'var(--bad)';
         const diffSign = diff >= 0 ? '+' : '';
+        const diffDisplay = v2026 > 0 ? `${diffSign}${fmtFull(diff)} (${diffSign}${diffPct}%)` : '—';
 
         rows.push(`<tr>
           <td><b>${qLabel}</b></td>
@@ -811,7 +811,7 @@
           <td class="amt">${fmtFull(v2024)}</td>
           <td class="amt">${fmtFull(v2025)}</td>
           <td class="amt">${fmtFull(v2026)}</td>
-          <td class="amt" style="color:${diffColor};font-weight:700">${diffSign}${fmtFull(diff)} (${diffSign}${diffPct}%)</td>
+          <td class="amt" style="color:${diffColor};font-weight:700">${diffDisplay}</td>
         </tr>`);
 
         totals[2023] += v2023;
@@ -822,9 +822,10 @@
 
       // Add Total row
       const totalDiff = totals[2026] - totals[2025];
-      const totalDiffPct = totals[2025] > 0 ? ((totalDiff / totals[2025]) * 100).toFixed(0) : 0;
+      const totalDiffPct = totals[2025] > 0 && totals[2026] > 0 ? ((totalDiff / totals[2025]) * 100).toFixed(0) : '';
       const totalDiffColor = totalDiff >= 0 ? 'var(--good)' : 'var(--bad)';
       const totalDiffSign = totalDiff >= 0 ? '+' : '';
+      const totalDiffDisplay = totals[2026] > 0 ? `${totalDiffSign}${fmtFull(totalDiff)} (${totalDiffSign}${totalDiffPct}%)` : '—';
 
       rows.push(`<tr style="background:var(--line-strong);font-weight:700;border-top:2px solid var(--line)">
         <td>Total</td>
@@ -832,7 +833,7 @@
         <td class="amt">${fmtFull(totals[2024])}</td>
         <td class="amt">${fmtFull(totals[2025])}</td>
         <td class="amt">${fmtFull(totals[2026])}</td>
-        <td class="amt" style="color:${totalDiffColor}">${totalDiffSign}${fmtFull(totalDiff)} (${totalDiffSign}${totalDiffPct}%)</td>
+        <td class="amt" style="color:${totalDiffColor}">${totalDiffDisplay}</td>
       </tr>`);
 
       body.innerHTML = rows.join('');
@@ -925,55 +926,104 @@
 
   // ---------- FINANCIALS TAB ----------
   async function renderFinancials() {
-    const y = state.year;
+    // Historical data (fixed from 2023-2025)
+    const historicalNL = {
+      Q1: { 2023: 103380, 2024: 50610, 2025: 80269 },
+      Q2: { 2023: 76687, 2024: 31100, 2025: 33086 },
+      Q3: { 2023: 59815, 2024: 110138, 2025: 8250 },
+      Q4: { 2023: 52205, 2024: 51107, 2025: 43790 }
+    };
 
-    // Sales from won deals, filtered by quarter if selected
-    let won = wonDealsForYear(y);
-    if (state.quarter !== 'all') {
-      const q = +state.quarter;
-      won = won.filter(d => quarterOf(d.d) === q);
-    }
-    const nl  = sum(won, 'nl'), us = sum(won, 'us'), vl = sum(won, 'vl');
-    const sc  = scopeWon(y);
-    const gNL = state.quarter !== 'all' ? sc.gNL : sc.gNL;
-    const gUS = state.quarter !== 'all' ? sc.gUS : sc.gUS;
-    const gComb = gNL + gUS;
-    const pr  = gComb > 0 ? (nl + us) / gComb * 100 : 0;
+    const historicalUS = {
+      Q1: { 2023: 13325, 2024: 10601, 2025: 29685 },
+      Q2: { 2023: 22342, 2024: 16737, 2025: 14924 },
+      Q3: { 2023: 6036, 2024: 37557, 2025: 18982 },
+      Q4: { 2023: 2303, 2024: 2246, 2025: 11759 }
+    };
 
-    const set = (id, v) => { const el = $(id); if (el) el.textContent = v; };
-    set('#finYear',  y);
-    set('#finSales', fmtFull(nl + us));
-    set('#finNL',    fmtFull(nl));
-    set('#finUS',    fmtFull(us));
-    set('#finVL',    fmtFull(vl));
-    set('#finDeals', won.length + ' deals won');
-    set('#finNLMeta', Math.round(nl / (gNL || 1) * 100) + '% of ' + fmtMoney(gNL) + ' goal');
-    set('#finUSMeta', Math.round(us / (gUS || 1) * 100) + '% of ' + fmtMoney(gUS) + ' goal');
+    const renderFinTable = (bodyId, historical) => {
+      const body = $(bodyId); if (!body) return;
+      const rows = [];
+      let totals = { 2023: 0, 2024: 0, 2025: 0, 2026: 0 };
 
-    const pf = $('#finPfill'); if (pf) pf.style.width = Math.min(100, pr) + '%';
-    set('#finPct',      Math.round(pr) + '%');
-    set('#finGoalNote', 'of ' + fmtMoney(gComb) + ' goal');
+      const quarters = ['Q1', 'Q2', 'Q3', 'Q4'];
+      for (let q = 0; q < 4; q++) {
+        const qLabel = quarters[q];
+        const v2023 = historical[qLabel]?.[2023] || 0;
+        const v2024 = historical[qLabel]?.[2024] || 0;
+        const v2025 = historical[qLabel]?.[2025] || 0;
 
-    // Fetch ARR + Churn from Google Sheets via proxy
-    set('#finARR',        '…');
-    set('#finTotal75',    '…');
-    set('#finChurnTotal', '…');
+        // Get 2026 from Overview (won deals for this quarter)
+        const deals2026 = wonDealsForYear(state.year).filter(d => quarterOf(d.d) === q);
+        const key = bodyId === 'finNLBody' ? 'nl' : 'us';
+        const v2026 = sum(deals2026, key);
 
-    try {
-      const r = await fetch(`/.netlify/functions/finance-data?year=${y}`);
-      const d = await r.json();
-      if (d.error) throw new Error(d.error);
+        rows.push(`<tr>
+          <td><b>${qLabel}</b></td>
+          <td class="amt">${fmtFull(v2023)}</td>
+          <td class="amt">${fmtFull(v2024)}</td>
+          <td class="amt">${fmtFull(v2025)}</td>
+          <td class="amt">${fmtFull(v2026)}</td>
+        </tr>`);
 
-      set('#finARR',        fmtFull(d.arrTotal));
-      set('#finTotal75',    fmtFull(d.total75));
-      set('#finChurnTotal', fmtMoney(d.churnTotal));
-      const churnMeta = $('#finChurnTotalMeta');
-      if (churnMeta) churnMeta.textContent = d.churnCount + ' customers · ' + y + ' lost ARR';
-      const asOf = $('#finAsOf'); if (asOf) asOf.textContent = '';
-    } catch (e) {
-      set('#finARR', 'unavailable');
-      set('#finTotal75', 'unavailable');
-      set('#finChurnTotal', 'unavailable');
+        totals[2023] += v2023;
+        totals[2024] += v2024;
+        totals[2025] += v2025;
+        totals[2026] += v2026;
+      }
+
+      rows.push(`<tr style="background:var(--line-strong);font-weight:700;border-top:2px solid var(--line)">
+        <td>Total</td>
+        <td class="amt">${fmtFull(totals[2023])}</td>
+        <td class="amt">${fmtFull(totals[2024])}</td>
+        <td class="amt">${fmtFull(totals[2025])}</td>
+        <td class="amt">${fmtFull(totals[2026])}</td>
+      </tr>`);
+
+      body.innerHTML = rows.join('');
+    };
+
+    renderFinTable('finNLBody', historicalNL);
+    renderFinTable('finUSBody', historicalUS);
+
+    // YTD (combined NL + US)
+    const combBody = $('#finYTDBody'); if (combBody) {
+      const rows = [];
+      let totals = { 2023: 0, 2024: 0, 2025: 0, 2026: 0 };
+
+      const quarters = ['Q1', 'Q2', 'Q3', 'Q4'];
+      for (let q = 0; q < 4; q++) {
+        const qLabel = quarters[q];
+        const v2023 = (historicalNL[qLabel]?.[2023] || 0) + (historicalUS[qLabel]?.[2023] || 0);
+        const v2024 = (historicalNL[qLabel]?.[2024] || 0) + (historicalUS[qLabel]?.[2024] || 0);
+        const v2025 = (historicalNL[qLabel]?.[2025] || 0) + (historicalUS[qLabel]?.[2025] || 0);
+
+        const deals2026 = wonDealsForYear(state.year).filter(d => quarterOf(d.d) === q);
+        const v2026 = sum(deals2026, 'nl') + sum(deals2026, 'us');
+
+        rows.push(`<tr>
+          <td><b>${qLabel}</b></td>
+          <td class="amt">${fmtFull(v2023)}</td>
+          <td class="amt">${fmtFull(v2024)}</td>
+          <td class="amt">${fmtFull(v2025)}</td>
+          <td class="amt">${fmtFull(v2026)}</td>
+        </tr>`);
+
+        totals[2023] += v2023;
+        totals[2024] += v2024;
+        totals[2025] += v2025;
+        totals[2026] += v2026;
+      }
+
+      rows.push(`<tr style="background:var(--line-strong);font-weight:700;border-top:2px solid var(--line)">
+        <td>Total</td>
+        <td class="amt">${fmtFull(totals[2023])}</td>
+        <td class="amt">${fmtFull(totals[2024])}</td>
+        <td class="amt">${fmtFull(totals[2025])}</td>
+        <td class="amt">${fmtFull(totals[2026])}</td>
+      </tr>`);
+
+      combBody.innerHTML = rows.join('');
     }
   }
 
