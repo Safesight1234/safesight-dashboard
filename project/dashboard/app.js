@@ -637,7 +637,7 @@
           <div class="wrow-main">
             <div class="wrow-top"><span class="who">${esc(d.t || d.c)}</span><span class="amt">${fmtMoney(v)}</span></div>
             <div class="submeta">${esc(d.rep || '')} · ${prob}% close</div>
-            <div class="barline"><i style="width:${(v / allOpenMax) * 100}%;background:${color}"></i></div>
+            <div class="barline"><i style="width:${prob}%;background:${color}"></i></div>
           </div>
         </div>`;
       }).join('') : '<div class="empty">No open deals with value in selection</div>';
