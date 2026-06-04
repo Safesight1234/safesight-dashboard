@@ -700,32 +700,39 @@
   }
 
   function renderHistoricals() {
-    const renderHistTable = (bodyId, key) => {
+    // Historical data from 2023-2025 (hardcoded from sheets)
+    const historicalNL = {
+      Q1: { 2023: 103380, 2024: 50610, 2025: 80269 },
+      Q2: { 2023: 76687, 2024: 31100, 2025: 33086 },
+      Q3: { 2023: 59815, 2024: 110138, 2025: 8250 },
+      Q4: { 2023: 52205, 2024: 51107, 2025: 43790 }
+    };
+
+    const historicalUS = {
+      Q1: { 2023: 13325, 2024: 10601, 2025: 29685 },
+      Q2: { 2023: 22342, 2024: 16737, 2025: 14924 },
+      Q3: { 2023: 6036, 2024: 37557, 2025: 18982 },
+      Q4: { 2023: 2303, 2024: 2246, 2025: 11759 }
+    };
+
+    const renderHistTable = (bodyId, historical) => {
       const body = $(bodyId); if (!body) return;
-
-      // Build data for years 2023-2026, quarters Q1-Q4
-      const data = {};
-      for (let yr = 2023; yr <= 2026; yr++) {
-        for (let q = 0; q < 4; q++) {
-          const k = `${yr}-${q}`;
-          const deals = wonDealsForYear(yr).filter(d => quarterOf(d.d) === q);
-          data[k] = sum(deals, key);
-        }
-      }
-
-      // Build rows for Q1-Q4 and Total
       const rows = [];
       let totals = { 2023: 0, 2024: 0, 2025: 0, 2026: 0 };
 
+      const quarters = ['Q1', 'Q2', 'Q3', 'Q4'];
       for (let q = 0; q < 4; q++) {
-        const v2023 = data[`2023-${q}`];
-        const v2024 = data[`2024-${q}`];
-        const v2025 = data[`2025-${q}`];
-        let v2026 = 0;
+        const qLabel = quarters[q];
+        const v2023 = historical[qLabel]?.[2023] || 0;
+        const v2024 = historical[qLabel]?.[2024] || 0;
+        const v2025 = historical[qLabel]?.[2025] || 0;
 
-        // For 2026, only include selected quarter (or all if YTD)
+        // Get 2026 from current deals (only if quarter is selected)
+        let v2026 = 0;
         if (state.quarter === 'all' || +state.quarter === q) {
-          v2026 = data[`2026-${q}`];
+          const deals2026 = wonDealsForYear(state.year).filter(d => quarterOf(d.d) === q);
+          const key = bodyId === 'histNLBody' ? 'nl' : 'us';
+          v2026 = sum(deals2026, key);
         }
 
         const diff = v2026 - v2025;
@@ -734,7 +741,7 @@
         const diffSign = diff >= 0 ? '+' : '';
 
         rows.push(`<tr>
-          <td><b>Q${q + 1}</b></td>
+          <td><b>${qLabel}</b></td>
           <td class="amt">${fmtFull(v2023)}</td>
           <td class="amt">${fmtFull(v2024)}</td>
           <td class="amt">${fmtFull(v2025)}</td>
@@ -754,7 +761,7 @@
       const totalDiffColor = totalDiff >= 0 ? 'var(--good)' : 'var(--bad)';
       const totalDiffSign = totalDiff >= 0 ? '+' : '';
 
-      rows.push(`<tr style="background:var(--line-strong);font-weight:700">
+      rows.push(`<tr style="background:var(--line-strong);font-weight:700;border-top:2px solid var(--line)">
         <td>Total</td>
         <td class="amt">${fmtFull(totals[2023])}</td>
         <td class="amt">${fmtFull(totals[2024])}</td>
@@ -766,31 +773,26 @@
       body.innerHTML = rows.join('');
     };
 
-    renderHistTable('histNLBody', 'nl');
-    renderHistTable('histUSBody', 'us');
+    renderHistTable('histNLBody', historicalNL);
+    renderHistTable('histUSBody', historicalUS);
 
-    // Combined (NL + US only)
+    // Combined (NL + US)
     const combBody = $('#histCombBody'); if (combBody) {
-      const data = {};
-      for (let yr = 2023; yr <= 2026; yr++) {
-        for (let q = 0; q < 4; q++) {
-          const k = `${yr}-${q}`;
-          const deals = wonDealsForYear(yr).filter(d => quarterOf(d.d) === q);
-          data[k] = sum(deals, 'nl') + sum(deals, 'us');
-        }
-      }
-
       const rows = [];
       let totals = { 2023: 0, 2024: 0, 2025: 0, 2026: 0 };
 
+      const quarters = ['Q1', 'Q2', 'Q3', 'Q4'];
       for (let q = 0; q < 4; q++) {
-        const v2023 = data[`2023-${q}`];
-        const v2024 = data[`2024-${q}`];
-        const v2025 = data[`2025-${q}`];
-        let v2026 = 0;
+        const qLabel = quarters[q];
+        const v2023 = (historicalNL[qLabel]?.[2023] || 0) + (historicalUS[qLabel]?.[2023] || 0);
+        const v2024 = (historicalNL[qLabel]?.[2024] || 0) + (historicalUS[qLabel]?.[2024] || 0);
+        const v2025 = (historicalNL[qLabel]?.[2025] || 0) + (historicalUS[qLabel]?.[2025] || 0);
 
+        // Get 2026 from current deals
+        let v2026 = 0;
         if (state.quarter === 'all' || +state.quarter === q) {
-          v2026 = data[`2026-${q}`];
+          const deals2026 = wonDealsForYear(state.year).filter(d => quarterOf(d.d) === q);
+          v2026 = sum(deals2026, 'nl') + sum(deals2026, 'us');
         }
 
         const diff = v2026 - v2025;
@@ -799,7 +801,7 @@
         const diffSign = diff >= 0 ? '+' : '';
 
         rows.push(`<tr>
-          <td><b>Q${q + 1}</b></td>
+          <td><b>${qLabel}</b></td>
           <td class="amt">${fmtFull(v2023)}</td>
           <td class="amt">${fmtFull(v2024)}</td>
           <td class="amt">${fmtFull(v2025)}</td>
@@ -818,7 +820,7 @@
       const totalDiffColor = totalDiff >= 0 ? 'var(--good)' : 'var(--bad)';
       const totalDiffSign = totalDiff >= 0 ? '+' : '';
 
-      rows.push(`<tr style="background:var(--line-strong);font-weight:700">
+      rows.push(`<tr style="background:var(--line-strong);font-weight:700;border-top:2px solid var(--line)">
         <td>Total</td>
         <td class="amt">${fmtFull(totals[2023])}</td>
         <td class="amt">${fmtFull(totals[2024])}</td>
