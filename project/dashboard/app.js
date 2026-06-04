@@ -795,9 +795,10 @@
         const v2024 = historical[qLabel]?.[2024] || 0;
         const v2025 = historical[qLabel]?.[2025] || 0;
 
-        // Get 2026 from current deals - use combined NL+US for all tables
+        // Get 2026 from current deals - separate by table type
         const deals2026 = wonDealsForYear(state.year).filter(d => quarterOf(d.d) === q);
-        const v2026 = sum(deals2026, 'nl') + sum(deals2026, 'us');
+        const key = bodyId === 'histNLBody' ? 'nl' : 'us';
+        const v2026 = sum(deals2026, key);
 
         const diff = v2026 - v2025;
         const diffPct = v2025 > 0 && v2026 > 0 ? ((diff / v2025) * 100).toFixed(0) : '';
