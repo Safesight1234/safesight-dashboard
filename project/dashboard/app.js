@@ -126,7 +126,7 @@
   }
 
   // ---------- top-level render ----------
-  function render() {
+  async function render() {
     if (!DATA || !DATA.deals || !DATA.deals.length) {
       document.body.innerHTML = '<div style="padding:60px;text-align:center;color:#fff;font-family:sans-serif"><h2>No data loaded</h2><p>Click Sync Teamleader to load data.</p></div>';
       return;
@@ -150,7 +150,7 @@
     $$('.tabbtn').forEach(b => b.classList.toggle('active', b.dataset.tab === state.tab));
     if (state.tab === 'overview') renderOverview();
     else if (state.tab === 'pipeline') renderPipeline();
-    else if (state.tab === 'financials') renderFinancials();
+    else if (state.tab === 'financials') await renderFinancials();
     else if (state.tab === 'historicals') renderHistoricals();
     $('#updated').innerHTML = 'Data as of <b>' + (DATA.generated || '—') + '</b>';
   }
@@ -584,15 +584,15 @@
       const tot = $('#closeMonthTot');
       const closeTotal = closeThisMonth.reduce((s, d) => s + d.nl + d.us, 0);
       if (tot) tot.textContent = fmtMoney(closeTotal);
-      closeEl.innerHTML = closeThisMonth.length ? closeThisMonth.map((d, i) => {
+      closeEl.innerHTML = closeThisMonth.length ? closeThisMonth.map(d => {
         const amt = d.nl + d.us;
         const prob = d.prob ? Math.round(d.prob * 100) : 0;
-        return `<div style="padding:10px;border-bottom:1px solid var(--line-faint);display:flex;justify-content:space-between;align-items:center">
+        return `<div style="padding:8px 0;border-bottom:1px solid var(--line-faint);display:flex;justify-content:space-between;align-items:flex-start;gap:12px">
           <div style="flex:1;min-width:0">
-            <div style="font-weight:600;font-size:13px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(d.t || d.c)}</div>
-            <div style="font-size:11px;color:var(--ink-faint);margin-top:2px">${esc(d.rep || '—')} · ${prob}%</div>
+            <div style="font-weight:600;font-size:13px;color:var(--ink)">${esc(d.t || d.c)}</div>
+            <div style="font-size:11px;color:var(--ink-faint)">${esc(d.rep || '—')} · ${prob}%</div>
           </div>
-          <div style="font-weight:700;font-size:12px;margin-left:8px;white-space:nowrap">${fmtMoney(amt)}</div>
+          <div style="font-weight:700;font-size:12px;white-space:nowrap">${fmtMoney(amt)}</div>
         </div>`;
       }).join('') : '<div style="padding:20px;text-align:center;color:var(--ink-faint);font-size:12px">No high probability deals closing this month</div>';
     }
@@ -700,7 +700,6 @@
       const totalVal = stages.reduce((s, st) => s + st.value, 0);
       const totalWeighted = stages.reduce((s, st) => s + st.weighted, 0);
 
-      const stageIds = stages.map((_, i) => `stage-${i}`);
       funnelEl.innerHTML = `
         <div class="pfunnel">
           <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:12px">
@@ -708,26 +707,25 @@
             <div style="font-size:14px;color:var(--ink-dim)">${fmtMoney(totalVal)} / ${fmtMoney(totalWeighted)} weighted</div>
           </div>
           ${stages.map((s, idx) => `
-            <div style="margin-bottom:12px;border:1px solid var(--line);border-radius:6px;overflow:hidden">
-              <div style="padding:10px;background:var(--bg-2);cursor:pointer" class="stage-header" data-stage="${idx}">
-                <div style="display:flex;justify-content:space-between;align-items:center">
-                  <div style="display:flex;align-items:center;gap:8px;flex:1">
-                    <span style="font-weight:700;font-size:13px;color:var(--ink)">${esc(s.name)}</span>
-                    <span style="font-size:11px;color:var(--good);font-weight:700;background:var(--good-bg);padding:2px 6px;border-radius:3px">${s.prob}%</span>
-                    <span style="font-size:11px;color:var(--ink-faint)">${s.count} deals</span>
-                  </div>
-                  <div style="display:flex;align-items:center;gap:8px">
-                    <span style="font-weight:700;font-size:13px">${fmtMoney(s.value)}</span>
-                    <span style="color:var(--ink-faint);font-size:16px">▼</span>
-                  </div>
+            <div style="margin-bottom:16px">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+                <div style="display:flex;align-items:center;gap:8px">
+                  <span style="font-weight:600;color:var(--ink)">${esc(s.name)}</span>
+                  <span style="font-size:12px;color:var(--good);font-weight:700">${s.prob}%</span>
                 </div>
+                <span style="font-weight:700;color:var(--ink)">${fmtMoney(s.value)}</span>
               </div>
-              <div style="background:var(--line);height:3px;width:${(s.value/maxVal)*100}%"></div>
-              <div class="stage-deals" style="display:none;padding:8px;border-top:1px solid var(--line);max-height:200px;overflow-y:auto">
+              <div style="background:var(--line);height:6px;border-radius:3px;overflow:hidden;margin-bottom:4px">
+                <div style="height:100%;background:var(--newlogo);width:${(s.value/maxVal)*100}%"></div>
+              </div>
+              <div style="font-size:11px;color:var(--ink-faint);cursor:pointer" class="stage-toggle" data-stage="${idx}" data-expanded="false">
+                ${s.count} deal${s.count !== 1 ? 's' : ''} · ${fmtMoney(s.weighted)} weighted · <span style="color:var(--good)">click to see deals</span>
+              </div>
+              <div class="stage-deals-${idx}" style="display:none;margin-top:8px;padding-left:12px;border-left:2px solid var(--line-faint)">
                 ${s.deals.map(d => `
-                  <div style="padding:6px;font-size:11px;border-bottom:1px solid var(--line-faint)">
+                  <div style="padding:6px 0;font-size:11px;border-bottom:1px solid var(--line-faint)">
                     <div style="font-weight:600;color:var(--ink)">${esc(d.t || d.c)}</div>
-                    <div style="color:var(--ink-faint);margin-top:2px">${esc(d.rep || '—')} · ${fmtMoney(d.nl)}</div>
+                    <div style="color:var(--ink-faint)">${esc(d.rep || '—')} · ${fmtMoney(d.nl)}</div>
                   </div>
                 `).join('')}
               </div>
@@ -737,13 +735,14 @@
       `;
 
       // Add click handlers for expanding/collapsing stages
-      funnelEl.querySelectorAll('.stage-header').forEach(header => {
-        header.addEventListener('click', function() {
-          const deals = this.nextElementSibling.nextElementSibling;
-          if (deals) {
-            deals.style.display = deals.style.display === 'none' ? 'block' : 'none';
-            const arrow = this.querySelector('[style*="▼"]');
-            if (arrow) arrow.style.transform = deals.style.display === 'none' ? 'rotate(0deg)' : 'rotate(180deg)';
+      funnelEl.querySelectorAll('.stage-toggle').forEach(toggle => {
+        toggle.addEventListener('click', function() {
+          const stageIdx = this.dataset.stage;
+          const dealsDiv = funnelEl.querySelector(`.stage-deals-${stageIdx}`);
+          if (dealsDiv) {
+            const isExpanded = this.dataset.expanded === 'true';
+            dealsDiv.style.display = isExpanded ? 'none' : 'block';
+            this.dataset.expanded = !isExpanded;
           }
         });
       });
