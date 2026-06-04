@@ -55,14 +55,15 @@
     const sym = state.currency === 'usd' ? '$' : '€';
     const a = Math.abs(val);
     if (a >= 1e6) return sym + (val / 1e6).toFixed(a >= 1e7 ? 1 : 2).replace(/\.?0+$/, '') + 'M';
-    if (a >= 1000) return sym + Math.round(val / 1000) + 'k';
-    return sym + Math.round(val);
+    if (a >= 1000) return sym + (val / 1000).toFixed(1) + 'k';
+    return sym + val.toFixed(1);
   }
   function fmtFull(n) {
     const rate = (window.SAFESIGHT_DEFAULT?.exchangeRate || 1.08);
     const val = state.currency === 'usd' ? n * rate : n;
     const sym = state.currency === 'usd' ? '$' : '€';
-    return sym + Math.round(val).toLocaleString('en-US');
+    const formatted = val.toFixed(1).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    return sym + formatted;
   }
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c])); }
 
@@ -442,11 +443,13 @@
     const body = $('#dealBreakdownBody'); if (!body) return;
     let arr = wonDealsForYear(y);
     if (state.quarter !== 'all') arr = arr.filter(d => quarterOf(d.d) === +state.quarter);
+    // Filter to only include deals with NL or US values (exclude renewal-only)
+    arr = arr.filter(d => (d.nl_arr + d.nl_oo + d.nl_ob + d.us_arr + d.us_oo + d.us_ob) > 0);
     arr = arr.slice().sort((a, b) => b.d.localeCompare(a.d));
     body.innerHTML = arr.length ? arr.map(d => {
       const arr_val = d.nl_arr + d.us_arr;
       const oneoff_val = d.nl_oo + d.us_oo;
-      const onboard_val = d.nl_ob + d.us_ob + d.vl_oo + d.vl_impl;
+      const onboard_val = d.nl_ob + d.us_ob;
       const total = arr_val + oneoff_val + onboard_val;
       return `<tr><td class="name">${esc(d.t || d.c)}</td><td>${esc(d.ct || '—')}</td><td>${esc(d.ty || '—')}</td><td class="amt">${fmtFull(arr_val)}</td><td class="amt">${fmtFull(oneoff_val)}</td><td class="amt">${fmtFull(onboard_val)}</td><td class="amt">${fmtFull(total)}</td></tr>`;
     }).join('') : '<tr><td colspan="7" class="empty">No won deals in selection</td></tr>';
@@ -529,6 +532,17 @@
     const allOpen = openDealsForYear(y);
     const scoped = state.quarter === 'all' ? allOpen : allOpen.filter(d => quarterOf(d.d) === +state.quarter);
     const today = new Date();
+
+    // Pipeline phase percentages (must be defined before use)
+    const phasePercentages = {
+      'First contact': 10,
+      'Discovery call/meeting': 20,
+      'Follow-up/demo': 40,
+      'Proposal sent': 50,
+      'Feedback proposal': 75,
+      'Verbal agreement': 90,
+      'Accepted': 100
+    };
 
     const nlDeals  = scoped.filter(d => d.pi === "New logo's");
     const usDeals  = scoped.filter(d => d.pi === 'Customer Growth');
@@ -624,17 +638,6 @@
 
     // Remove old sections
     $$('#funnel, #funnelDetail, #pipeTableWrap').forEach(el => { if (el) el.innerHTML = ''; });
-
-    // Pipeline phase percentages
-    const phasePercentages = {
-      'First contact': 10,
-      'Discovery call/meeting': 20,
-      'Follow-up/demo': 40,
-      'Proposal sent': 50,
-      'Feedback proposal': 75,
-      'Verbal agreement': 90,
-      'Accepted': 100
-    };
 
     // New Logo funnel by stage
     const funnelEl = $('#funnel');

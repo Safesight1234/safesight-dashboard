@@ -335,7 +335,7 @@ const server = http.createServer(async (req, res) => {
   }
 
   // ── Static files ──
-  let filePath = path.join(PROJECT_DIR, pathname === '/' ? 'Sales Dashboard.html' : pathname);
+  let filePath = path.join(PROJECT_DIR, pathname === '/' ? 'index.html' : pathname);
   // Prevent directory traversal
   if (!filePath.startsWith(PROJECT_DIR)) { res.writeHead(403); res.end(); return; }
 
