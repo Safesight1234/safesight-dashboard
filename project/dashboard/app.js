@@ -516,7 +516,7 @@
         <span class="rank">${i + 1}</span>
         <div class="wrow-main">
           <div class="wrow-top"><span class="who">${esc(d.t || d.c)}</span>${typePill(d)}<span class="amt">${fmtMoney(v)}</span></div>
-          <div class="barline"><i style="width:${(v / max) * 100}%"></i></div>
+          <div class="barline"><i style="width:100%"></i></div>
         </div>
       </div>`;
     }).join('') : '<div class="empty">No won deals in selection</div>';
