@@ -145,6 +145,8 @@
     if (finEl) finEl.classList.toggle('hidden', state.tab !== 'financials');
     const histEl = $('#tab-historicals');
     if (histEl) histEl.classList.toggle('hidden', state.tab !== 'historicals');
+    const qSeg = $('#qSeg');
+    if (qSeg) qSeg.classList.toggle('hidden', state.tab === 'historicals');
     $$('.tabbtn').forEach(b => b.classList.toggle('active', b.dataset.tab === state.tab));
     if (state.tab === 'overview') renderOverview();
     else if (state.tab === 'pipeline') renderPipeline();
@@ -749,13 +751,10 @@
         const v2024 = historical[qLabel]?.[2024] || 0;
         const v2025 = historical[qLabel]?.[2025] || 0;
 
-        // Get 2026 from current deals (only if quarter is selected)
-        let v2026 = 0;
-        if (state.quarter === 'all' || +state.quarter === q) {
-          const deals2026 = wonDealsForYear(state.year).filter(d => quarterOf(d.d) === q);
-          const key = bodyId === 'histNLBody' ? 'nl' : 'us';
-          v2026 = sum(deals2026, key);
-        }
+        // Get 2026 from current deals (all quarters for historicals overview)
+        const deals2026 = wonDealsForYear(state.year).filter(d => quarterOf(d.d) === q);
+        const key = bodyId === 'histNLBody' ? 'nl' : 'us';
+        const v2026 = sum(deals2026, key);
 
         const diff = v2026 - v2025;
         const diffPct = v2025 > 0 ? ((diff / v2025) * 100).toFixed(0) : 0;
@@ -810,12 +809,9 @@
         const v2024 = (historicalNL[qLabel]?.[2024] || 0) + (historicalUS[qLabel]?.[2024] || 0);
         const v2025 = (historicalNL[qLabel]?.[2025] || 0) + (historicalUS[qLabel]?.[2025] || 0);
 
-        // Get 2026 from current deals
-        let v2026 = 0;
-        if (state.quarter === 'all' || +state.quarter === q) {
-          const deals2026 = wonDealsForYear(state.year).filter(d => quarterOf(d.d) === q);
-          v2026 = sum(deals2026, 'nl') + sum(deals2026, 'us');
-        }
+        // Get 2026 from current deals (all quarters for historicals overview)
+        const deals2026 = wonDealsForYear(state.year).filter(d => quarterOf(d.d) === q);
+        const v2026 = sum(deals2026, 'nl') + sum(deals2026, 'us');
 
         const diff = v2026 - v2025;
         const diffPct = v2025 > 0 ? ((diff / v2025) * 100).toFixed(0) : 0;
