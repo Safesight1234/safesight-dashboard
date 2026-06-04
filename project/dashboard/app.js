@@ -617,6 +617,10 @@
           </div>
         </div>`;
       }).join('') : '<div style="padding:20px;text-align:center;color:var(--ink-faint);font-size:12px">No high probability deals closing this month</div>';
+
+      // Hide the panel when no deals to close this month
+      const closePanel = $('#closeMonthPanel');
+      if (closePanel) closePanel.classList.toggle('hidden', closeThisMonth.length === 0);
     }
 
     // All open deals (New Logo + Upsell, excluding $0 values)

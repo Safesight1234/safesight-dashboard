@@ -369,6 +369,12 @@ select.ctl, .filter select {
   display: grid; gap: var(--gap);
   grid-template-columns: 2fr 1fr;
 }
+#pipeMainGrid:has(#closeMonthPanel.hidden) {
+  grid-template-columns: 1fr;
+}
+#closeMonthPanel.hidden {
+  display: none;
+}
 @media (max-width: 1100px) { .grid-main { grid-template-columns: 1fr; } }
 
 .panel-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px; flex-wrap: wrap; }
@@ -902,8 +908,8 @@ table.deals td.reason { color: var(--ink-dim); max-width: 420px; line-height: 1.
   <div id="tab-pipeline" class="hidden">
     <div class="pipe-note">Open pipeline — deals <b>not yet won or lost</b>, both <b>new logo</b> and <b>upsell</b>, scoped by the <b>quarter or month</b> you select above (by expected close date). Weighted = value × win&nbsp;probability. <b id="pipeAsOf"></b>.</div>
     <section class="pipe-cards" id="pipeCards"></section>
-    <section class="grid-main">
-      <div class="panel">
+    <section class="grid-main" id="pipeMainGrid">
+      <div class="panel" id="closeMonthPanel">
         <div class="panel-head">
           <h2>To close current month</h2>
           <span class="streamtot" id="closeMonthTot"></span>
