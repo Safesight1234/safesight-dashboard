@@ -554,8 +554,11 @@
       <div class="submeta">${n} deals · ${fmtMoney(wv)} weighted</div>
     </div>`).join('');
 
-    // Helper: get probability from deal's custom field
-    const pctClose = (d) => d.prob ? Math.round(d.prob) : 0;
+    // Helper: get percentage from pipeline phase
+    const pctClose = (d) => {
+      const phasePerc = phasePercentages[d.stage] || 0;
+      return phasePerc;
+    };
 
     // New Logo column
     const nlSorted = nlDeals.slice().sort((a, b) => b.nl - a.nl);
@@ -622,26 +625,49 @@
     // Remove old sections
     $$('#funnel, #funnelDetail, #pipeTableWrap').forEach(el => { if (el) el.innerHTML = ''; });
 
+    // Pipeline phase percentages
+    const phasePercentages = {
+      'First contact': 10,
+      'Discovery call/meeting': 20,
+      'Follow-up/demo': 40,
+      'Proposal sent': 50,
+      'Feedback proposal': 75,
+      'Verbal agreement': 90,
+      'Accepted': 100
+    };
+
     // New Logo funnel by stage
     const funnelEl = $('#funnel');
     if (funnelEl) {
       const stageMap = {};
       nlDeals.forEach(d => {
-        const stage = d.stage || 'Unknown';
+        const stage = (d.stage && d.stage.trim()) ? d.stage : null;
+        if (!stage) return; // Skip deals without a stage
         if (!stageMap[stage]) stageMap[stage] = { deals: [], nl: 0, weighted: 0 };
+        const phasePerc = phasePercentages[stage] || 0;
         stageMap[stage].deals.push(d);
         stageMap[stage].nl += d.nl;
-        stageMap[stage].weighted += d.nl * (d.prob || 0) / 100;
+        stageMap[stage].weighted += d.nl * phasePerc / 100;
       });
 
-      const stages = Object.entries(stageMap).map(([name, data]) => ({
-        name,
-        count: data.deals.length,
-        value: data.nl,
-        weighted: data.weighted,
-        deals: data.deals,
-        prob: Math.round(data.deals.reduce((s, d) => s + (d.prob || 0), 0) / data.deals.length)
-      }));
+      const stages = Object.entries(stageMap)
+        .filter(([name]) => name && name.trim())
+        .map(([name, data]) => ({
+          name,
+          count: data.deals.length,
+          value: data.nl,
+          weighted: data.weighted,
+          deals: data.deals,
+          prob: phasePercentages[name] || 0
+        }));
+
+      if (stages.length === 0) {
+        funnelEl.innerHTML = `<div class="pfunnel">
+          <h3 style="font-size:16px;font-weight:700;color:var(--ink);margin-bottom:12px">New logo funnel</h3>
+          <div style="color:var(--ink-faint);font-size:13px;padding:20px;text-align:center">No pipeline stages configured for deals in selection</div>
+        </div>`;
+        return;
+      }
 
       const maxVal = Math.max(...stages.map(s => s.value), 1);
       const totalVal = stages.reduce((s, st) => s + st.value, 0);
