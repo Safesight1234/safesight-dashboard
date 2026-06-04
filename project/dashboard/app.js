@@ -526,7 +526,7 @@
     const openEl = $('#openList'); if (!openEl) return;
     let arr = openDealsForYear(y);
     if (state.quarter !== 'all') arr = arr.filter(d => quarterOf(d.d) === +state.quarter);
-    arr = arr.filter(d => (d.nl + d.us) > 0).slice().sort((a, b) => (b.nl + b.us) - (a.nl + a.us));
+    arr = arr.filter(d => (d.nl + d.us) > 0).slice().sort((a, b) => (b.prob || 0) - (a.prob || 0));
     const max = arr.reduce((m, d) => Math.max(m, d.nl + d.us), 1);
     const total = arr.reduce((s, d) => s + d.nl + d.us, 0);
     const sub = $('#openSub'), tot = $('#openTot');
