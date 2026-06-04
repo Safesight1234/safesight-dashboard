@@ -621,9 +621,11 @@
       }).join('') : '<div class="empty">No open deals with value in selection</div>';
     }
 
-    // Upsell column
-    const usSorted = usDeals.slice().sort((a, b) => b.us - a.us);
+    // Upsell column (Pipeline per person)
+    const usWithValue = usDeals.filter(d => d.us > 0);
+    const usSorted = usWithValue.slice().sort((a, b) => b.us - a.us);
     const usMax = usSorted.length ? usSorted[0].us : 1;
+    const usTotal = usSorted.reduce((s, d) => s + d.us, 0);
     const usEl = $('#pipeReps');
     if (usEl) {
       const tot = $('#pipeRepsTot');
