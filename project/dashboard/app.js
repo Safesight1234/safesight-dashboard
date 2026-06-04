@@ -186,7 +186,23 @@
 
     const scWon = scopeWon(y);
     const wonSales = scWon.nl + scWon.us;
-    const pipeNL = sc.nl - scWon.nl, pipeUS = sc.us - scWon.us;
+
+    // Calculate pipeline by pipeline type (not total minus won)
+    let openNL = 0, openUS = 0;
+    const openDeals = dealsForYear(y).filter(d => isOpen(d));
+    if (state.quarter !== 'all') {
+      const q = +state.quarter;
+      openDeals.filter(d => quarterOf(d.d) === q).forEach(d => {
+        if (d.pi === "New logo's") openNL += d.nl + d.us;
+        else if (d.pi === 'Customer Growth') openUS += d.nl + d.us;
+      });
+    } else {
+      openDeals.forEach(d => {
+        if (d.pi === "New logo's") openNL += d.nl + d.us;
+        else if (d.pi === 'Customer Growth') openUS += d.nl + d.us;
+      });
+    }
+
     const pr = progressBlock(wonSales, scWon.gComb);
     $('#kpiSales').textContent = fmtMoney(wonSales);
     $('#ytdLabel').textContent = sc.label + (sc.isQ ? '' : ' · YTD');
@@ -195,11 +211,11 @@
     $('#ppct').textContent = pr.pctTxt;
     $('#goalAmt').textContent = fmtMoney(scWon.gComb);
     $('#pGoalNote').textContent = fmtMoney(wonSales) + ' won';
-    $('#dealCount').textContent = scWon.n + ' won · ' + (sc.n - scWon.n) + ' open';
+    $('#dealCount').textContent = scWon.n + ' won · ' + (openNL + openUS > 0 ? Math.round((openNL + openUS) / 1000) + 'k' : '0') + ' pipeline';
     $('#kpiSalesMeta').innerHTML = cmp ? deltaHTML(wonSales, scC.nl + scC.us, cmp) : '';
 
-    fillKPI('NL', scWon.nl, pipeNL, scWon.gNL, cmp ? scC.nl : null, cmp);
-    fillKPI('US', scWon.us, pipeUS, scWon.gUS, cmp ? scC.us : null, cmp);
+    fillKPI('NL', scWon.nl, openNL, scWon.gNL, cmp ? scC.nl : null, cmp);
+    fillKPI('US', scWon.us, openUS, scWon.gUS, cmp ? scC.us : null, cmp);
     $('#kpiVL').textContent = fmtMoney(scWon.vl);
     $('#kpiVLMeta').innerHTML = cmp ? deltaHTML(scWon.vl, scC.vl, cmp) : '<span class="submeta">no goal set</span>';
 
