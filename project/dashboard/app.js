@@ -253,11 +253,10 @@
 
   function fillKPI(id, won, pipeline, goal, prev, cmp) {
     $('#kpi' + id).textContent = fmtMoney(won);
-    // Won deals always show 100% (full bar), not percentage of goal
-    const pct = 100;
+    const pct = goal > 0 ? (won / goal) * 100 : 0;
     $('#p' + id + 'fill').style.width = Math.min(100, pct) + '%';
     $('#kpi' + id + 'Meta').innerHTML =
-      `<span class="goalpct">${won > 0 ? '100% won' : '0%'}</span>` +
+      `<span class="goalpct">${pct.toFixed(0)}% of ${fmtMoney(goal)}</span>` +
       (pipeline > 0 ? ` <span class="submeta">+${fmtMoney(pipeline)} pipeline</span>` : '') +
       (cmp ? ' ' + deltaHTML(won, prev, cmp) : '');
   }
