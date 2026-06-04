@@ -137,18 +137,18 @@ exports.handler = async () => {
     // Fetch open, won, and lost deals separately
     let openDeals = [], wonDeals = [], lostDeals = [];
     try {
-      openDeals = await tlAll('deals.list', { filter: { pipeline_ids: [cfg.p1, cfg.p2], status: ['open'] }, includes: 'custom_fields' }, token);
+      openDeals = await tlAll('deals.list', { filter: { pipeline_ids: [cfg.p1, cfg.p2], status: ['open'] }, includes: 'custom_fields,pipeline_stage' }, token);
     } catch (e) {
-      const all = await tlAll('deals.list', { filter: { pipeline_ids: [cfg.p1, cfg.p2] }, includes: 'custom_fields' }, token);
+      const all = await tlAll('deals.list', { filter: { pipeline_ids: [cfg.p1, cfg.p2] }, includes: 'custom_fields,pipeline_stage' }, token);
       openDeals = all.filter(d => !d.won_at && !d.lost_at && !d.refused_at);
       wonDeals  = all.filter(d =>  d.won_at);
     }
     try {
       if (!wonDeals.length)
-        wonDeals = await tlAll('deals.list', { filter: { pipeline_ids: [cfg.p1, cfg.p2], status: ['won'] }, includes: 'custom_fields' }, token);
+        wonDeals = await tlAll('deals.list', { filter: { pipeline_ids: [cfg.p1, cfg.p2], status: ['won'] }, includes: 'custom_fields,pipeline_stage' }, token);
     } catch (e) {}
     try {
-      lostDeals = await tlAll('deals.list', { filter: { pipeline_ids: [cfg.p1, cfg.p2], status: ['lost'] }, includes: 'custom_fields' }, token);
+      lostDeals = await tlAll('deals.list', { filter: { pipeline_ids: [cfg.p1, cfg.p2], status: ['lost'] }, includes: 'custom_fields,pipeline_stage' }, token);
     } catch (e) {}
 
     const rawDeals = openDeals.map(d => ({ ...d, _detectedStatus: 'open' }))
