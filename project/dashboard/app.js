@@ -601,15 +601,21 @@
       const tot = $('#closeMonthTot');
       const closeTotal = closeThisMonth.reduce((s, d) => s + d.nl + d.us, 0);
       if (tot) tot.textContent = fmtMoney(closeTotal);
+      const closeMax = closeThisMonth.length ? closeThisMonth[0].nl + closeThisMonth[0].us : 1;
       closeEl.innerHTML = closeThisMonth.length ? closeThisMonth.map(d => {
         const amt = d.nl + d.us;
         const prob = d.prob ? Math.round(d.prob * 100) : 0;
-        return `<div style="padding:8px 0;border-bottom:1px solid var(--line-faint);display:flex;justify-content:space-between;align-items:flex-start;gap:12px">
-          <div style="flex:1;min-width:0">
-            <div style="font-weight:600;font-size:13px;color:var(--ink)">${esc(d.t || d.c)}</div>
-            <div style="font-size:11px;color:var(--ink-faint)">${esc(d.rep || '—')} · ${prob}%</div>
+        return `<div style="padding:8px 0;border-bottom:1px solid var(--line-faint)">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:4px">
+            <div style="flex:1;min-width:0">
+              <div style="font-weight:600;font-size:13px;color:var(--ink)">${esc(d.t || d.c)}</div>
+              <div style="font-size:11px;color:var(--ink-faint)">${esc(d.rep || '—')} · ${prob}%</div>
+            </div>
+            <div style="font-weight:700;font-size:12px;white-space:nowrap">${fmtMoney(amt)}</div>
           </div>
-          <div style="font-weight:700;font-size:12px;white-space:nowrap">${fmtMoney(amt)}</div>
+          <div style="background:var(--line);height:4px;border-radius:2px;overflow:hidden">
+            <div style="height:100%;background:var(--good);width:${(amt/closeMax)*100}%"></div>
+          </div>
         </div>`;
       }).join('') : '<div style="padding:20px;text-align:center;color:var(--ink-faint);font-size:12px">No high probability deals closing this month</div>';
     }
