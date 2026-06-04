@@ -613,7 +613,7 @@
             <div style="font-weight:700;font-size:12px;white-space:nowrap">${fmtMoney(amt)}</div>
           </div>
           <div style="background:var(--line);height:4px;border-radius:2px;overflow:hidden">
-            <div style="height:100%;background:var(--good);width:${(amt/closeMax)*100}%"></div>
+            <div style="height:100%;background:var(--good);width:${prob}%"></div>
           </div>
         </div>`;
       }).join('') : '<div style="padding:20px;text-align:center;color:var(--ink-faint);font-size:12px">No high probability deals closing this month</div>';
