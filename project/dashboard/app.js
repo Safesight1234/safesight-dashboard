@@ -574,6 +574,25 @@
       return phasePerc;
     };
 
+    // To close current month (high probability deals closing this month)
+    const currentMonth = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0');
+    const closeThisMonth = scoped.filter(d => d.d.startsWith(currentMonth) && (d.prob || 0) >= 0.5).slice().sort((a, b) => (b.nl + b.us) - (a.nl + a.us));
+    const closeEl = $('#closeMonthList');
+    if (closeEl) {
+      const tot = $('#closeMonthTot');
+      const closeTotal = closeThisMonth.reduce((s, d) => s + d.nl + d.us, 0);
+      if (tot) tot.textContent = fmtMoney(closeTotal);
+      closeEl.innerHTML = closeThisMonth.length ? closeThisMonth.map(d => {
+        const amt = d.nl + d.us;
+        return `<div class="wrow">
+          <div class="wrow-main">
+            <div class="wrow-top"><span class="who">${esc(d.t || d.c)}</span><span class="amt">${fmtMoney(amt)}</span></div>
+            <div class="submeta">${esc(d.rep || '')} · ${d.prob ? Math.round(d.prob * 100) : 0}% prob</div>
+          </div>
+        </div>`;
+      }).join('') : '<div class="empty" style="padding:20px;text-align:center">No high probability deals closing this month</div>';
+    }
+
     // New Logo column
     const nlSorted = nlDeals.slice().sort((a, b) => b.nl - a.nl);
     const nlMax = nlSorted.length ? nlSorted[0].nl : 1;

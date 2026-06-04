@@ -905,13 +905,20 @@ table.deals td.reason { color: var(--ink-dim); max-width: 420px; line-height: 1.
   <div id="tab-pipeline" class="hidden">
     <div class="pipe-note">Open pipeline — deals <b>not yet won or lost</b>, both <b>new logo</b> and <b>upsell</b>, scoped by the <b>quarter or month</b> you select above (by expected close date). Weighted = value × win&nbsp;probability. <b id="pipeAsOf"></b>.</div>
     <section class="pipe-cards" id="pipeCards"></section>
-    <section class="pipe-open">
+    <section class="grid-main">
       <div class="panel">
         <div class="panel-head">
-          <h2>Open deals <span class="subh" id="pipeOpenSub"></span></h2>
+          <h2>To close current month</h2>
+          <span class="streamtot" id="closeMonthTot"></span>
+        </div>
+        <div class="lb scrolllist" id="closeMonthList"></div>
+      </div>
+      <div class="panel">
+        <div class="panel-head">
+          <h2>All open deals of selected quarter <span class="subh" id="pipeOpenSub"></span></h2>
           <span class="streamtot" id="pipeTopTot"></span>
         </div>
-        <div class="lb" id="pipeTop"></div>
+        <div class="lb scrolllist" style="max-height:400px;font-size:12px" id="pipeTop"></div>
       </div>
     </section>
     <section class="grid-main">
