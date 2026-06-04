@@ -607,14 +607,14 @@
       if (sub) sub.textContent = allOpenDeals.length + ' deals';
       if (tot) tot.textContent = fmtMoney(allOpenTotal);
       nlEl.innerHTML = allOpenDeals.length ? allOpenDeals.map((d, i) => {
-        const close = pctClose(d);
+        const prob = d.prob ? Math.round(d.prob * 100) : 0;
         const v = d.nl + d.us;
         const color = d.pi === "New logo's" ? 'var(--newlogo)' : 'var(--upsell)';
         return `<div class="wrow">
           <span class="rank">${i + 1}</span>
           <div class="wrow-main">
             <div class="wrow-top"><span class="who">${esc(d.t || d.c)}</span><span class="amt">${fmtMoney(v)}</span></div>
-            <div class="submeta">${esc(d.rep || '')} · ${close}% close</div>
+            <div class="submeta">${esc(d.rep || '')} · ${prob}% close</div>
             <div class="barline"><i style="width:${(v / allOpenMax) * 100}%;background:${color}"></i></div>
           </div>
         </div>`;
@@ -631,12 +631,12 @@
       const tot = $('#pipeRepsTot');
       if (tot) tot.textContent = fmtMoney(usTotal);
       usEl.innerHTML = usSorted.length ? usSorted.map((d, i) => {
-        const close = pctClose(d);
+        const prob = d.prob ? Math.round(d.prob * 100) : 0;
         return `<div class="wrow">
           <span class="rank">${i + 1}</span>
           <div class="wrow-main">
             <div class="wrow-top"><span class="who">${esc(d.t || d.c)}</span><span class="amt">${fmtMoney(d.us)}</span></div>
-            <div class="submeta">${esc(d.rep || '')} · ${close}% close</div>
+            <div class="submeta">${esc(d.rep || '')} · ${prob}% close</div>
             <div class="barline"><i style="width:${(d.us / usMax) * 100}%;background:var(--upsell)"></i></div>
           </div>
         </div>`;
@@ -652,12 +652,12 @@
       if (sub) sub.textContent = vlSorted.length + ' deals';
       if (tot) tot.textContent = fmtMoney(vlTotal);
       renewEl.innerHTML = vlSorted.length ? vlSorted.map((d, i) => {
-        const close = pctClose(d);
+        const prob = d.prob ? Math.round(d.prob * 100) : 0;
         return `<div class="wrow">
           <span class="rank">${i + 1}</span>
           <div class="wrow-main">
             <div class="wrow-top"><span class="who">${esc(d.t || d.c)}</span><span class="amt">${fmtMoney(d.vl)}</span></div>
-            <div class="submeta">${esc(d.rep || '')} · ${close}% close</div>
+            <div class="submeta">${esc(d.rep || '')} · ${prob}% close</div>
             <div class="barline"><i style="width:${(d.vl / vlMax) * 100}%;background:var(--renewal)"></i></div>
           </div>
         </div>`;
