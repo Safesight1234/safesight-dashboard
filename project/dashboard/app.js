@@ -142,10 +142,13 @@
     $('#tab-pipeline').classList.toggle('hidden', state.tab !== 'pipeline');
     const finEl = $('#tab-financials');
     if (finEl) finEl.classList.toggle('hidden', state.tab !== 'financials');
+    const histEl = $('#tab-historicals');
+    if (histEl) histEl.classList.toggle('hidden', state.tab !== 'historicals');
     $$('.tabbtn').forEach(b => b.classList.toggle('active', b.dataset.tab === state.tab));
     if (state.tab === 'overview') renderOverview();
     else if (state.tab === 'pipeline') renderPipeline();
     else if (state.tab === 'financials') renderFinancials();
+    else if (state.tab === 'historicals') renderHistoricals();
     $('#updated').innerHTML = 'Data as of <b>' + (DATA.generated || '—') + '</b>';
   }
 
@@ -667,6 +670,138 @@
           `).join('')}
         </div>
       `;
+    }
+  }
+
+  function renderHistoricals() {
+    const renderHistTable = (bodyId, key) => {
+      const body = $(bodyId); if (!body) return;
+
+      // Build data for years 2023-2026, quarters Q1-Q4
+      const data = {};
+      for (let yr = 2023; yr <= 2026; yr++) {
+        for (let q = 0; q < 4; q++) {
+          const k = `${yr}-${q}`;
+          const deals = wonDealsForYear(yr).filter(d => quarterOf(d.d) === q);
+          data[k] = sum(deals, key);
+        }
+      }
+
+      // Build rows for Q1-Q4 and Total
+      const rows = [];
+      let totals = { 2023: 0, 2024: 0, 2025: 0, 2026: 0 };
+
+      for (let q = 0; q < 4; q++) {
+        const v2023 = data[`2023-${q}`];
+        const v2024 = data[`2024-${q}`];
+        const v2025 = data[`2025-${q}`];
+        let v2026 = 0;
+
+        // For 2026, only include selected quarter (or all if YTD)
+        if (state.quarter === 'all' || +state.quarter === q) {
+          v2026 = data[`2026-${q}`];
+        }
+
+        const diff = v2026 - v2025;
+        const diffPct = v2025 > 0 ? ((diff / v2025) * 100).toFixed(0) : 0;
+        const diffColor = diff >= 0 ? 'var(--good)' : 'var(--bad)';
+        const diffSign = diff >= 0 ? '+' : '';
+
+        rows.push(`<tr>
+          <td><b>Q${q + 1}</b></td>
+          <td class="amt">${fmtFull(v2023)}</td>
+          <td class="amt">${fmtFull(v2024)}</td>
+          <td class="amt">${fmtFull(v2025)}</td>
+          <td class="amt">${fmtFull(v2026)}</td>
+          <td class="amt" style="color:${diffColor};font-weight:700">${diffSign}${fmtFull(diff)} (${diffSign}${diffPct}%)</td>
+        </tr>`);
+
+        totals[2023] += v2023;
+        totals[2024] += v2024;
+        totals[2025] += v2025;
+        totals[2026] += v2026;
+      }
+
+      // Add Total row
+      const totalDiff = totals[2026] - totals[2025];
+      const totalDiffPct = totals[2025] > 0 ? ((totalDiff / totals[2025]) * 100).toFixed(0) : 0;
+      const totalDiffColor = totalDiff >= 0 ? 'var(--good)' : 'var(--bad)';
+      const totalDiffSign = totalDiff >= 0 ? '+' : '';
+
+      rows.push(`<tr style="background:var(--line-strong);font-weight:700">
+        <td>Total</td>
+        <td class="amt">${fmtFull(totals[2023])}</td>
+        <td class="amt">${fmtFull(totals[2024])}</td>
+        <td class="amt">${fmtFull(totals[2025])}</td>
+        <td class="amt">${fmtFull(totals[2026])}</td>
+        <td class="amt" style="color:${totalDiffColor}">${totalDiffSign}${fmtFull(totalDiff)} (${totalDiffSign}${totalDiffPct}%)</td>
+      </tr>`);
+
+      body.innerHTML = rows.join('');
+    };
+
+    renderHistTable('histNLBody', 'nl');
+    renderHistTable('histUSBody', 'us');
+
+    // Combined (NL + US only)
+    const combBody = $('#histCombBody'); if (combBody) {
+      const data = {};
+      for (let yr = 2023; yr <= 2026; yr++) {
+        for (let q = 0; q < 4; q++) {
+          const k = `${yr}-${q}`;
+          const deals = wonDealsForYear(yr).filter(d => quarterOf(d.d) === q);
+          data[k] = sum(deals, 'nl') + sum(deals, 'us');
+        }
+      }
+
+      const rows = [];
+      let totals = { 2023: 0, 2024: 0, 2025: 0, 2026: 0 };
+
+      for (let q = 0; q < 4; q++) {
+        const v2023 = data[`2023-${q}`];
+        const v2024 = data[`2024-${q}`];
+        const v2025 = data[`2025-${q}`];
+        let v2026 = 0;
+
+        if (state.quarter === 'all' || +state.quarter === q) {
+          v2026 = data[`2026-${q}`];
+        }
+
+        const diff = v2026 - v2025;
+        const diffPct = v2025 > 0 ? ((diff / v2025) * 100).toFixed(0) : 0;
+        const diffColor = diff >= 0 ? 'var(--good)' : 'var(--bad)';
+        const diffSign = diff >= 0 ? '+' : '';
+
+        rows.push(`<tr>
+          <td><b>Q${q + 1}</b></td>
+          <td class="amt">${fmtFull(v2023)}</td>
+          <td class="amt">${fmtFull(v2024)}</td>
+          <td class="amt">${fmtFull(v2025)}</td>
+          <td class="amt">${fmtFull(v2026)}</td>
+          <td class="amt" style="color:${diffColor};font-weight:700">${diffSign}${fmtFull(diff)} (${diffSign}${diffPct}%)</td>
+        </tr>`);
+
+        totals[2023] += v2023;
+        totals[2024] += v2024;
+        totals[2025] += v2025;
+        totals[2026] += v2026;
+      }
+
+      const totalDiff = totals[2026] - totals[2025];
+      const totalDiffPct = totals[2025] > 0 ? ((totalDiff / totals[2025]) * 100).toFixed(0) : 0;
+      const totalDiffColor = totalDiff >= 0 ? 'var(--good)' : 'var(--bad)';
+      const totalDiffSign = totalDiff >= 0 ? '+' : '';
+
+      rows.push(`<tr style="background:var(--line-strong);font-weight:700">
+        <td>Total</td>
+        <td class="amt">${fmtFull(totals[2023])}</td>
+        <td class="amt">${fmtFull(totals[2024])}</td>
+        <td class="amt">${fmtFull(totals[2025])}</td>
+        <td class="amt">${fmtFull(totals[2026])}</td>
+        <td class="amt" style="color:${totalDiffColor}">${totalDiffSign}${fmtFull(totalDiff)} (${totalDiffSign}${totalDiffPct}%)</td>
+      </tr>`);
+
+      combBody.innerHTML = rows.join('');
     }
   }
 

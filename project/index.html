@@ -719,6 +719,7 @@ table.deals td.reason { color: var(--ink-dim); max-width: 420px; line-height: 1.
       <button class="tabbtn" data-tab="overview">Overview</button>
       <button class="tabbtn" data-tab="pipeline">Pipeline</button>
       <button class="tabbtn" data-tab="financials">Financials</button>
+      <button class="tabbtn" data-tab="historicals">Historicals</button>
     </div>
     <div class="spacer"></div>
     <div class="toolbar">
@@ -1002,6 +1003,35 @@ table.deals td.reason { color: var(--ink-dim); max-width: 420px; line-height: 1.
         <div class="meta"><span class="submeta" id="finChurnTotalMeta">Lost ARR</span></div>
       </div>
     </section>
+  </div>
+
+  <!-- HISTORICALS TAB -->
+  <div id="tab-historicals" class="hidden">
+    <div style="display:flex;flex-direction:column;gap:20px;padding:0 2px">
+      <div class="panel">
+        <h2 style="margin-bottom:16px">Achieved New logo 2026</h2>
+        <table class="deals compact" style="width:100%">
+          <thead><tr><th>Quarter</th><th>2023</th><th>2024</th><th>2025</th><th>2026</th><th>Difference</th></tr></thead>
+          <tbody id="histNLBody"></tbody>
+        </table>
+      </div>
+
+      <div class="panel">
+        <h2 style="margin-bottom:16px">Achieved Upsell 2026</h2>
+        <table class="deals compact" style="width:100%">
+          <thead><tr><th>Quarter</th><th>2023</th><th>2024</th><th>2025</th><th>2026</th><th>Difference</th></tr></thead>
+          <tbody id="histUSBody"></tbody>
+        </table>
+      </div>
+
+      <div class="panel">
+        <h2 style="margin-bottom:16px">Achieved New logo + Upsell 2026</h2>
+        <table class="deals compact" style="width:100%">
+          <thead><tr><th>Quarter</th><th>2023</th><th>2024</th><th>2025</th><th>2026</th><th>Difference</th></tr></thead>
+          <tbody id="histCombBody"></tbody>
+        </table>
+      </div>
+    </div>
   </div>
 
 </div>
