@@ -212,6 +212,7 @@
     renderStreamChart('us', '#usChart', '#usTotal');
     renderBreakdown(sc);
     renderLeaderboard(y);
+    renderDealBreakdown(y);
     renderTable(y);
     renderWonList(y);
     renderOpenList(y);
@@ -434,6 +435,20 @@
     return `<span class="pill mix">${esc(d.ty) || '—'}</span>`;
   }
 
+  function renderDealBreakdown(y) {
+    const body = $('#dealBreakdownBody'); if (!body) return;
+    let arr = wonDealsForYear(y);
+    if (state.quarter !== 'all') arr = arr.filter(d => quarterOf(d.d) === +state.quarter);
+    arr = arr.slice().sort((a, b) => b.d.localeCompare(a.d));
+    body.innerHTML = arr.length ? arr.map(d => {
+      const arr_val = d.nl_arr + d.us_arr;
+      const oneoff_val = d.nl_oo + d.us_oo;
+      const onboard_val = d.nl_ob + d.us_ob + d.vl_oo + d.vl_impl;
+      const total = arr_val + oneoff_val + onboard_val;
+      return `<tr><td class="name">${esc(d.t || d.c)}</td><td>${esc(d.ct || '—')}</td><td>${esc(d.ty || '—')}</td><td class="amt">${fmtFull(arr_val)}</td><td class="amt">${fmtFull(oneoff_val)}</td><td class="amt">${fmtFull(onboard_val)}</td><td class="amt">${fmtFull(total)}</td></tr>`;
+    }).join('') : '<tr><td colspan="7" class="empty">No won deals in selection</td></tr>';
+  }
+
   function renderTable(y) {
     const body = $('#dealsBody'); if (!body) return;
     let arr = dealsForYear(y);
@@ -603,6 +618,56 @@
 
     // Remove old sections
     $$('#funnel, #funnelDetail, #pipeTableWrap').forEach(el => { if (el) el.innerHTML = ''; });
+
+    // New Logo funnel by stage
+    const funnelEl = $('#funnel');
+    if (funnelEl) {
+      const stageMap = {};
+      nlDeals.forEach(d => {
+        const stage = d.stage || 'Unknown';
+        if (!stageMap[stage]) stageMap[stage] = { deals: [], nl: 0, weighted: 0 };
+        stageMap[stage].deals.push(d);
+        stageMap[stage].nl += d.nl;
+        stageMap[stage].weighted += d.nl * (d.prob || 0) / 100;
+      });
+
+      const stages = Object.entries(stageMap).map(([name, data]) => ({
+        name,
+        count: data.deals.length,
+        value: data.nl,
+        weighted: data.weighted,
+        deals: data.deals,
+        prob: Math.round(data.deals.reduce((s, d) => s + (d.prob || 0), 0) / data.deals.length)
+      }));
+
+      const maxVal = Math.max(...stages.map(s => s.value), 1);
+      const totalVal = stages.reduce((s, st) => s + st.value, 0);
+      const totalWeighted = stages.reduce((s, st) => s + st.weighted, 0);
+
+      funnelEl.innerHTML = `
+        <div class="pfunnel">
+          <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:12px">
+            <h3 style="font-size:16px;font-weight:700;color:var(--ink)">New logo funnel</h3>
+            <div style="font-size:14px;color:var(--ink-dim)">${fmtMoney(totalVal)} / ${fmtMoney(totalWeighted)} weighted</div>
+          </div>
+          ${stages.map(s => `
+            <div style="margin-bottom:16px">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+                <div style="display:flex;align-items:center;gap:8px">
+                  <span style="font-weight:600;color:var(--ink)">${esc(s.name)}</span>
+                  <span style="font-size:12px;color:var(--good);font-weight:700">${s.prob}%</span>
+                </div>
+                <span style="font-weight:700;color:var(--ink)">${fmtMoney(s.value)}</span>
+              </div>
+              <div style="background:var(--line);height:6px;border-radius:3px;overflow:hidden;margin-bottom:4px">
+                <div style="height:100%;background:var(--newlogo);width:${(s.value/maxVal)*100}%"></div>
+              </div>
+              <div style="font-size:11px;color:var(--ink-faint)">${s.count} deal${s.count !== 1 ? 's' : ''} · ${fmtMoney(s.weighted)} weighted</div>
+            </div>
+          `).join('')}
+        </div>
+      `;
+    }
   }
 
   async function renderChurn(y) {
@@ -637,11 +702,18 @@
   async function renderFinancials() {
     const y = state.year;
 
-    // Sales from won deals
-    const won = wonDealsForYear(y);
+    // Sales from won deals, filtered by quarter if selected
+    let won = wonDealsForYear(y);
+    if (state.quarter !== 'all') {
+      const q = +state.quarter;
+      won = won.filter(d => quarterOf(d.d) === q);
+    }
     const nl  = sum(won, 'nl'), us = sum(won, 'us'), vl = sum(won, 'vl');
     const sc  = scopeWon(y);
-    const pr  = sc.gComb > 0 ? (nl + us) / sc.gComb * 100 : 0;
+    const gNL = state.quarter !== 'all' ? sc.gNL : sc.gNL;
+    const gUS = state.quarter !== 'all' ? sc.gUS : sc.gUS;
+    const gComb = gNL + gUS;
+    const pr  = gComb > 0 ? (nl + us) / gComb * 100 : 0;
 
     const set = (id, v) => { const el = $(id); if (el) el.textContent = v; };
     set('#finYear',  y);
@@ -650,12 +722,12 @@
     set('#finUS',    fmtFull(us));
     set('#finVL',    fmtFull(vl));
     set('#finDeals', won.length + ' deals won');
-    set('#finNLMeta', Math.round(nl / (sc.gNL || 1) * 100) + '% of ' + fmtMoney(sc.gNL) + ' goal');
-    set('#finUSMeta', Math.round(us / (sc.gUS || 1) * 100) + '% of ' + fmtMoney(sc.gUS) + ' goal');
+    set('#finNLMeta', Math.round(nl / (gNL || 1) * 100) + '% of ' + fmtMoney(gNL) + ' goal');
+    set('#finUSMeta', Math.round(us / (gUS || 1) * 100) + '% of ' + fmtMoney(gUS) + ' goal');
 
     const pf = $('#finPfill'); if (pf) pf.style.width = Math.min(100, pr) + '%';
     set('#finPct',      Math.round(pr) + '%');
-    set('#finGoalNote', 'of ' + fmtMoney(sc.gComb) + ' goal');
+    set('#finGoalNote', 'of ' + fmtMoney(gComb) + ' goal');
 
     // Fetch ARR + Churn from Google Sheets via proxy
     set('#finARR',        '…');
