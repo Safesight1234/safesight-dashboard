@@ -536,13 +536,8 @@
       <div class="submeta">${n} deals · ${fmtMoney(wv)} weighted</div>
     </div>`).join('');
 
-    // Helper: days until close / total days in quarter
-    const pctClose = (dStr) => {
-      const daysUntil = Math.max(0, (new Date(dStr) - today) / 86400000);
-      const daysInQtr = 90;
-      const pct = Math.min(100, Math.max(0, (1 - daysUntil / daysInQtr) * 100));
-      return Math.round(pct);
-    };
+    // Helper: get probability from deal's custom field
+    const pctClose = (d) => d.prob ? Math.round(d.prob) : 0;
 
     // New Logo column
     const nlSorted = nlDeals.slice().sort((a, b) => b.nl - a.nl);
@@ -553,7 +548,7 @@
       if (sub) sub.textContent = nlSorted.length + ' deals';
       if (tot) tot.textContent = fmtMoney(nlTotal);
       nlEl.innerHTML = nlSorted.length ? nlSorted.map((d, i) => {
-        const close = pctClose(d.d);
+        const close = pctClose(d);
         return `<div class="wrow">
           <span class="rank">${i + 1}</span>
           <div class="wrow-main">
@@ -573,7 +568,7 @@
       const tot = $('#pipeRepsTot');
       if (tot) tot.textContent = fmtMoney(usTotal);
       usEl.innerHTML = usSorted.length ? usSorted.map((d, i) => {
-        const close = pctClose(d.d);
+        const close = pctClose(d);
         return `<div class="wrow">
           <span class="rank">${i + 1}</span>
           <div class="wrow-main">
@@ -594,7 +589,7 @@
       if (sub) sub.textContent = vlSorted.length + ' deals';
       if (tot) tot.textContent = fmtMoney(vlTotal);
       renewEl.innerHTML = vlSorted.length ? vlSorted.map((d, i) => {
-        const close = pctClose(d.d);
+        const close = pctClose(d);
         return `<div class="wrow">
           <span class="rank">${i + 1}</span>
           <div class="wrow-main">
