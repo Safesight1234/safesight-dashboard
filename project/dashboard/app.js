@@ -576,9 +576,9 @@
     const vlWt = vlDeals.reduce((s, d) => s + (d.vl || 0) * (d.prob || 0), 0);
 
     $('#pipeCards').innerHTML = [
-      { label: 'OPEN PIPELINE', v: pipeTotal, wv: nlWt + usWt, n: scoped.length, col: 'var(--ink)' },
-      { label: 'NEW LOGO',      v: nlTotal,  wv: nlWt, n: nlDeals.length, col: 'var(--newlogo)' },
-      { label: 'UPSELL',        v: usTotal,  wv: usWt, n: usDeals.length, col: 'var(--upsell)' },
+      { label: 'OPEN PIPELINE', v: pipeTotal, wv: nlWt + usWt, n: scoped.filter(d => (d.nl + d.us) > 0).length, col: 'var(--ink)' },
+      { label: 'NEW LOGO',      v: nlTotal,  wv: nlWt, n: nlDeals.filter(d => d.nl > 0).length, col: 'var(--newlogo)' },
+      { label: 'UPSELL',        v: usTotal,  wv: usWt, n: usDeals.filter(d => d.us > 0).length, col: 'var(--upsell)' },
       { label: 'RENEWALS DUE',  v: vlTotal,  wv: vlWt, n: vlDeals.length, col: 'var(--renewal)' },
     ].map(({ label, v, wv, n, col }) => `<div class="panel pq">
       <div class="ptitle" style="color:${col}">${label}</div>
