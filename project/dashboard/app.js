@@ -510,7 +510,7 @@
     const openEl = $('#openList'); if (!openEl) return;
     let arr = openDealsForYear(y);
     if (state.quarter !== 'all') arr = arr.filter(d => quarterOf(d.d) === +state.quarter);
-    arr = arr.slice().sort((a, b) => (b.nl + b.us) - (a.nl + a.us));
+    arr = arr.filter(d => (d.nl + d.us) > 0).slice().sort((a, b) => (b.nl + b.us) - (a.nl + a.us));
     const max = arr.reduce((m, d) => Math.max(m, d.nl + d.us), 1);
     const total = arr.reduce((s, d) => s + d.nl + d.us, 0);
     const sub = $('#openSub'), tot = $('#openTot');
@@ -595,25 +595,28 @@
       }).join('') : '<div class="empty" style="padding:20px;text-align:center">No high probability deals closing this month</div>';
     }
 
-    // New Logo column
-    const nlSorted = nlDeals.slice().sort((a, b) => b.nl - a.nl);
-    const nlMax = nlSorted.length ? nlSorted[0].nl : 1;
+    // All open deals (New Logo + Upsell, excluding $0 values)
+    const allOpenDeals = scoped.filter(d => (d.nl + d.us) > 0).slice().sort((a, b) => (b.nl + b.us) - (a.nl + a.us));
+    const allOpenMax = allOpenDeals.length ? allOpenDeals[0].nl + allOpenDeals[0].us : 1;
+    const allOpenTotal = allOpenDeals.reduce((s, d) => s + d.nl + d.us, 0);
     const nlEl = $('#pipeTop');
     if (nlEl) {
       const sub = $('#pipeOpenSub'), tot = $('#pipeTopTot');
-      if (sub) sub.textContent = nlSorted.length + ' deals';
-      if (tot) tot.textContent = fmtMoney(nlTotal);
-      nlEl.innerHTML = nlSorted.length ? nlSorted.map((d, i) => {
+      if (sub) sub.textContent = allOpenDeals.length + ' deals';
+      if (tot) tot.textContent = fmtMoney(allOpenTotal);
+      nlEl.innerHTML = allOpenDeals.length ? allOpenDeals.map((d, i) => {
         const close = pctClose(d);
+        const v = d.nl + d.us;
+        const color = d.pi === "New logo's" ? 'var(--newlogo)' : 'var(--upsell)';
         return `<div class="wrow">
           <span class="rank">${i + 1}</span>
           <div class="wrow-main">
-            <div class="wrow-top"><span class="who">${esc(d.t || d.c)}</span><span class="amt">${fmtMoney(d.nl)}</span></div>
+            <div class="wrow-top"><span class="who">${esc(d.t || d.c)}</span><span class="amt">${fmtMoney(v)}</span></div>
             <div class="submeta">${esc(d.rep || '')} · ${close}% close</div>
-            <div class="barline"><i style="width:${(d.nl / nlMax) * 100}%;background:var(--newlogo)"></i></div>
+            <div class="barline"><i style="width:${(v / allOpenMax) * 100}%;background:${color}"></i></div>
           </div>
         </div>`;
-      }).join('') : '<div class="empty">No new logo deals</div>';
+      }).join('') : '<div class="empty">No open deals with value in selection</div>';
     }
 
     // Upsell column
@@ -665,8 +668,7 @@
     if (funnelEl) {
       const stageMap = {};
       nlDeals.forEach(d => {
-        const stage = (d.stage && d.stage.trim()) ? d.stage : null;
-        if (!stage) return; // Skip deals without a stage
+        const stage = (d.stage && d.stage.trim()) ? d.stage : 'No phase set';
         if (!stageMap[stage]) stageMap[stage] = { deals: [], nl: 0, weighted: 0 };
         const phasePerc = phasePercentages[stage] || 0;
         stageMap[stage].deals.push(d);
@@ -675,7 +677,6 @@
       });
 
       const stages = Object.entries(stageMap)
-        .filter(([name]) => name && name.trim())
         .map(([name, data]) => ({
           name,
           count: data.deals.length,
@@ -688,7 +689,7 @@
       if (stages.length === 0) {
         funnelEl.innerHTML = `<div class="pfunnel">
           <h3 style="font-size:16px;font-weight:700;color:var(--ink);margin-bottom:12px">New logo funnel</h3>
-          <div style="color:var(--ink-faint);font-size:13px;padding:20px;text-align:center">No pipeline stages configured for deals in selection</div>
+          <div style="color:var(--ink-faint);font-size:13px;padding:20px;text-align:center">No new logo deals in selection</div>
         </div>`;
         return;
       }
