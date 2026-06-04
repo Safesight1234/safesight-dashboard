@@ -686,8 +686,8 @@
       }).join('') : '<div class="empty">No renewals</div>';
     }
 
-    // Clear old sections (funnel is removed per user request)
-    $$('#funnel, #funnelDetail, #pipeTableWrap').forEach(el => { if (el) el.innerHTML = ''; });
+    // Clear old sections
+    const table = $('#pipeTableWrap'); if (table) table.innerHTML = '';
   }
 
   function renderHistoricals() {
