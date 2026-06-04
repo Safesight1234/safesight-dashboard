@@ -620,7 +620,7 @@
     }
 
     // All open deals (New Logo + Upsell, excluding $0 values)
-    const allOpenDeals = scoped.filter(d => (d.nl + d.us) > 0).slice().sort((a, b) => (b.nl + b.us) - (a.nl + a.us));
+    const allOpenDeals = scoped.filter(d => (d.nl + d.us) > 0).slice().sort((a, b) => (b.prob || 0) - (a.prob || 0));
     const allOpenMax = allOpenDeals.length ? allOpenDeals[0].nl + allOpenDeals[0].us : 1;
     const allOpenTotal = allOpenDeals.reduce((s, d) => s + d.nl + d.us, 0);
     const nlEl = $('#pipeTop');
