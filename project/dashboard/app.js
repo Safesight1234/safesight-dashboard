@@ -648,26 +648,36 @@
       }).join('') : '<div class="empty">No open deals with value in selection</div>';
     }
 
-    // Upsell column (Pipeline per person)
-    const usWithValue = usDeals.filter(d => d.us > 0);
-    const usSorted = usWithValue.slice().sort((a, b) => b.us - a.us);
-    const usMax = usSorted.length ? usSorted[0].us : 1;
-    const usSortedTotal = usSorted.reduce((s, d) => s + d.us, 0);
+    // Pipeline per person - group by representative
+    const repMap = {};
+    openDeals.forEach(d => {
+      const rep = d.rep || 'Unknown';
+      if (!repMap[rep]) repMap[rep] = { nl: 0, us: 0, vl: 0, count: 0 };
+      repMap[rep].nl += d.nl;
+      repMap[rep].us += d.us;
+      repMap[rep].vl += d.vl;
+      repMap[rep].count += 1;
+    });
+    const reps = Object.entries(repMap).map(([name, vals]) => ({
+      name, nl: vals.nl, us: vals.us, vl: vals.vl, count: vals.count, total: vals.nl + vals.us + vals.vl
+    })).sort((a, b) => b.total - a.total);
+
+    const repTotal = reps.reduce((s, r) => s + r.total, 0);
+    const repMax = reps.length ? reps[0].total : 1;
     const usEl = $('#pipeReps');
     if (usEl) {
       const tot = $('#pipeRepsTot');
-      if (tot) tot.textContent = fmtMoney(usSortedTotal);
-      usEl.innerHTML = usSorted.length ? usSorted.map((d, i) => {
-        const prob = d.prob ? Math.round(d.prob * 100) : 0;
+      if (tot) tot.textContent = fmtMoney(repTotal);
+      usEl.innerHTML = reps.length ? reps.map((r, i) => {
         return `<div class="wrow">
           <span class="rank">${i + 1}</span>
           <div class="wrow-main">
-            <div class="wrow-top"><span class="who">${esc(d.t || d.c)}</span><span class="amt">${fmtMoney(d.us)}</span></div>
-            <div class="submeta">${esc(d.rep || '')} · ${prob}% close</div>
-            <div class="barline"><i style="width:${(d.us / usMax) * 100}%;background:var(--upsell)"></i></div>
+            <div class="wrow-top"><span class="who">${esc(r.name)}</span><span class="amt">${fmtMoney(r.total)}</span></div>
+            <div class="submeta">${r.count} deals · NL: ${fmtMoney(r.nl)} US: ${fmtMoney(r.us)}</div>
+            <div class="barline"><i style="width:${(r.total / repMax) * 100}%;background:var(--primary)"></i></div>
           </div>
         </div>`;
-      }).join('') : '<div class="empty">No upsell deals</div>';
+      }).join('') : '<div class="empty">No open deals</div>';
     }
 
     // Renewals column
