@@ -988,46 +988,153 @@
     }
   }
 
-  async function exportFinance() {
-    try {
-      const y = state.year;
-      let deals = wonDealsForYear(y).filter(d => !d.status || d.status === 'won');
+  function openExportModal() {
+    const y = state.year;
+    const modal = $('#finExportModal');
+    const granBtns = $$('#finExpGran button');
+    const yearSel = $('#finExpYear');
+    const periodSel = $('#finExpPeriod');
+    const periodWrap = $('#finExpPeriodWrap');
+    const summary = $('#finExpSummary');
 
-      // Filter by selected quarter/month
-      if (state.quarter !== 'all') {
-        const q = +state.quarter;
-        deals = deals.filter(d => quarterOf(d.d) === q);
+    // Initialize year select
+    yearSel.innerHTML = '';
+    for (let i = 2023; i <= y; i++) {
+      const opt = document.createElement('option');
+      opt.value = i;
+      opt.textContent = i;
+      if (i === y) opt.selected = true;
+      yearSel.appendChild(opt);
+    }
+
+    let expGran = 'quarter';
+    function updatePeriodSelect() {
+      const selYear = +yearSel.value;
+      periodSel.innerHTML = '';
+      if (expGran === 'month') {
+        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        months.forEach((m, i) => {
+          const opt = document.createElement('option');
+          opt.value = i;
+          opt.textContent = m + ' ' + selYear;
+          periodSel.appendChild(opt);
+        });
+      } else if (expGran === 'quarter') {
+        for (let q = 1; q <= 4; q++) {
+          const opt = document.createElement('option');
+          opt.value = q;
+          opt.textContent = 'Q' + q + ' ' + selYear;
+          periodSel.appendChild(opt);
+        }
+      } else {
+        const opt = document.createElement('option');
+        opt.value = 'all';
+        opt.textContent = 'Full Year ' + selYear;
+        periodSel.appendChild(opt);
+      }
+      updateSummary();
+    }
+
+    function updateSummary() {
+      const g = expGran, y = +yearSel.value, p = periodSel.value;
+      let label = g === 'month' ? 'Month' : g === 'quarter' ? 'Quarter' : 'Year';
+      let period = g === 'year' ? y : g === 'quarter' ? 'Q' + p + ' ' + y : ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][p] + ' ' + y;
+      summary.textContent = `Export will include new bookings and churn details for ${period}`;
+    }
+
+    granBtns.forEach(b => {
+      b.classList.remove('active');
+      b.addEventListener('click', () => {
+        expGran = b.dataset.g;
+        updatePeriodSelect();
+      });
+    });
+    $$('#finExpGran button')[expGran === 'month' ? 0 : expGran === 'quarter' ? 1 : 2].classList.add('active');
+    yearSel.addEventListener('change', updatePeriodSelect);
+    periodSel.addEventListener('change', updateSummary);
+
+    updatePeriodSelect();
+    modal.classList.add('show');
+
+    $('#finExportDo').onclick = async () => { await doExport(expGran, +yearSel.value, periodSel.value); };
+    $('#finExportCancel').onclick = () => modal.classList.remove('show');
+    $('#finExportClose').onclick = () => modal.classList.remove('show');
+  }
+
+  async function doExport(granularity, year, period) {
+    try {
+      if (!window.XLSX) { toast('Excel export not available'); return; }
+
+      let deals = wonDealsForYear(year).filter(d => !d.status || d.status === 'won');
+
+      // Filter deals by selected period
+      if (granularity === 'quarter') {
+        deals = deals.filter(d => quarterOf(d.d) === +period);
+      } else if (granularity === 'month') {
+        const monthVal = +period;
+        deals = deals.filter(d => monthOf(d.d) === monthVal);
       }
 
-      if (!deals.length) { toast('No deals to export for selected period'); return; }
-
-      // Build data rows
-      const rows = [['Title', 'Customer Name', 'Date Closed', 'Item Name', 'Amount (Euros)', 'Sales Rep', 'Industry', 'Bookings Type', 'Country', 'Pipeline']];
+      // Build New Bookings sheet
+      const bookingRows = [['Title', 'Customer Name', 'Date Closed', 'Item Name', 'Amount (Euros)', 'Sales Rep', 'Industry', 'Bookings Type']];
       deals.forEach(d => {
-        const items = [
-          { name: 'NL ARR', val: d.nl_arr },
-          { name: 'NL OO', val: d.nl_oo },
-          { name: 'NL OB', val: d.nl_ob },
-          { name: 'US ARR', val: d.us_arr },
-          { name: 'US OO', val: d.us_oo },
-          { name: 'US OB', val: d.us_ob },
-          { name: 'VL REC', val: d.vl_rec },
-          { name: 'VL OO', val: d.vl_oo },
-          { name: 'VL IMPL', val: d.vl_impl },
-        ].filter(i => i.val > 0);
-
-        items.forEach(item => {
-          rows.push([d.t, d.c, d.d, item.name, item.val, d.rep || '', d.ct || '', d.ty || '', d.co || '', d.pi || '']);
-        });
+        bookingRows.push([
+          d.t || '',
+          d.c || '',
+          d.d || '',
+          d.t || d.c || '',
+          d.nl + d.us || 0,
+          d.rep || '',
+          d.ct || '',
+          d.ty || ''
+        ]);
       });
 
-      // Convert to XLSX using SheetJS
-      if (!window.XLSX) { toast('Excel export not available'); return; }
-      const ws = window.XLSX.utils.aoa_to_sheet(rows);
+      // Fetch churn data and filter by period
+      let churnData = [];
+      try {
+        const r = await fetch(`/.netlify/functions/finance-data?year=${year}`);
+        const finData = await r.json();
+        if (finData.churnRows) {
+          churnData = finData.churnRows.filter(row => {
+            if (!row.when) return false;
+            if (granularity === 'quarter') {
+              const monthVal = parseInt(row.when.split('-')[1]) || 0;
+              const q = Math.ceil(monthVal / 3);
+              return q === +period;
+            } else if (granularity === 'month') {
+              const monthVal = parseInt(row.when.split('-')[1]) || 0;
+              return monthVal === +period + 1;
+            }
+            return true;
+          });
+        }
+      } catch (e) {
+        console.warn('Could not fetch churn data:', e);
+      }
+
+      // Build Churn sheet
+      const churnRows = [['Customer Name', 'Month ARR gets impacted', 'Item Name', 'Amount (Euros)']];
+      churnData.forEach(row => {
+        churnRows.push([
+          row.customer || '',
+          row.when || '',
+          row.reason || '',
+          row.revenue || 0
+        ]);
+      });
+
+      // Create workbook with both sheets
       const wb = window.XLSX.utils.book_new();
-      window.XLSX.utils.book_append_sheet(wb, ws, 'Bookings');
-      window.XLSX.writeFile(wb, `safesight-bookings-${y}-${state.quarter === 'all' ? 'all' : 'q' + state.quarter}.xlsx`);
-      toast(`Exported ${deals.length} bookings`);
+      const wsBookings = window.XLSX.utils.aoa_to_sheet(bookingRows);
+      const wsChurn = window.XLSX.utils.aoa_to_sheet(churnRows);
+      window.XLSX.utils.book_append_sheet(wb, wsBookings, 'New Bookings');
+      window.XLSX.utils.book_append_sheet(wb, wsChurn, 'Churn');
+
+      const fileName = granularity === 'month' ? `safesight-export-${year}-m${(+period + 1).toString().padStart(2, '0')}.xlsx` : granularity === 'quarter' ? `safesight-export-${year}-q${period}.xlsx` : `safesight-export-${year}.xlsx`;
+      window.XLSX.writeFile(wb, fileName);
+      toast(`Exported bookings & churn for selected period`);
+      $('#finExportModal').classList.remove('show');
     } catch (e) {
       toast('Export failed: ' + e.message);
     }
@@ -1059,7 +1166,7 @@
     }
     const expBtn = $('#finExportBtn');
     if (expBtn) {
-      expBtn.addEventListener('click', exportFinance);
+      expBtn.addEventListener('click', openExportModal);
     }
 
     const drop = $('#drop'); let dc = 0;
