@@ -857,15 +857,49 @@
       const r = await fetch(`/.netlify/functions/finance-data?year=${y}`);
       const d = await r.json();
       if (d.error) throw new Error(d.error);
-      if (sub) sub.textContent = (d.churnCount || 0) + ' in YTD ' + y;
-      if (tot) tot.textContent = fmtMoney(d.churnTotal) + ' churned';
-      const rows = d.churnRows || [];
+
+      // Filter churn rows by selected quarter
+      let rows = d.churnRows || [];
+      let churnTotal = d.churnTotal || 0;
+      let churnCount = d.churnCount || 0;
+      const quarterLabel = state.quarter === 'all' ? 'YTD ' + y : 'Q' + (+state.quarter + 1) + ' ' + y;
+
+      if (state.quarter !== 'all') {
+        const expectedQuarter = +state.quarter;
+        const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+        const parseMonth = (whenStr) => {
+          if (!whenStr) return 0;
+          const month = monthNames.findIndex(m => whenStr.toLowerCase().includes(m.toLowerCase()));
+          if (month >= 0) return month + 1;
+          const num = parseInt(whenStr);
+          return num > 0 && num <= 12 ? num : 0;
+        };
+
+        rows = rows.filter(row => {
+          const monthVal = parseMonth(row.when);
+          const q = Math.floor((monthVal - 1) / 3);
+          return q === expectedQuarter;
+        });
+
+        // Recalculate totals for filtered rows
+        churnTotal = rows.reduce((sum, r) => sum + (r.revenue || 0), 0);
+        churnCount = rows.length;
+      }
+
+      if (sub) sub.textContent = churnCount + ' in ' + quarterLabel;
+      if (tot) tot.textContent = fmtMoney(churnTotal) + ' churned';
       body.innerHTML = rows.length ? rows.map(r =>
         `<tr><td class="name">${esc(r.customer)}</td><td>${esc(r.industry)}</td><td>${esc(r.reason)}</td><td>${esc(r.when)}</td><td class="amt">${fmtFull(r.revenue)}</td></tr>`
-      ).join('') : '<tr><td colspan="5" class="empty">No churn data for ' + y + '</td></tr>';
-      // Also update Churn KPI
-      const chEl = $('#kpiChurn'); if (chEl) chEl.textContent = fmtMoney(d.churnTotal);
-      const chMeta = $('#kpiChurnMeta'); if (chMeta) chMeta.textContent = (d.churnCount || 0) + ' customers · ' + y + ' lost ARR';
+      ).join('') : '<tr><td colspan="5" class="empty">No churn data for ' + quarterLabel + '</td></tr>';
+
+      // Also update Churn KPI - but only if showing all quarters
+      if (state.quarter === 'all') {
+        const chEl = $('#kpiChurn'); if (chEl) chEl.textContent = fmtMoney(d.churnTotal);
+        const chMeta = $('#kpiChurnMeta'); if (chMeta) chMeta.textContent = (d.churnCount || 0) + ' customers · ' + y + ' lost ARR';
+      } else {
+        const chEl = $('#kpiChurn'); if (chEl) chEl.textContent = fmtMoney(churnTotal);
+        const chMeta = $('#kpiChurnMeta'); if (chMeta) chMeta.textContent = churnCount + ' customers · ' + quarterLabel + ' lost ARR';
+      }
     } catch (e) {
       body.innerHTML = '<tr><td colspan="5" class="empty">Churn data unavailable</td></tr>';
     }
