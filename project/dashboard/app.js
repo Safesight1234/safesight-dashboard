@@ -253,7 +253,10 @@
 
   function fillKPI(id, won, pipeline, goal, prev, cmp) {
     const pct = goal > 0 ? (won / goal) * 100 : 0;
-    $('#kpi' + id).textContent = fmtMoney(won) + (goal > 0 ? ` (${pct.toFixed(0)}%)` : '');
+    const el = $('#kpi' + id);
+    if (el) {
+      el.innerHTML = fmtMoney(won) + (goal > 0 ? ` <span style="font-size:0.6em;color:var(--ink-dim)">(${pct.toFixed(0)}%)</span>` : '');
+    }
     $('#p' + id + 'fill').style.width = Math.min(100, pct) + '%';
     $('#kpi' + id + 'Meta').innerHTML =
       `<span class="goalpct">${pct.toFixed(0)}% of ${fmtMoney(goal)}</span>` +
@@ -662,7 +665,7 @@
 
     // Pipeline per person - group by representative
     const repMap = {};
-    openDeals.forEach(d => {
+    scoped.forEach(d => {
       const rep = d.rep || 'Unknown';
       if (!repMap[rep]) repMap[rep] = { nl: 0, us: 0, vl: 0, count: 0 };
       repMap[rep].nl += d.nl;
@@ -804,9 +807,10 @@
         const v2026 = sum(deals2026, 'nl') + sum(deals2026, 'us');
 
         const diff = v2026 - v2025;
-        const diffPct = v2025 > 0 ? ((diff / v2025) * 100).toFixed(0) : 0;
+        const diffPct = v2025 > 0 && v2026 > 0 ? ((diff / v2025) * 100).toFixed(0) : '';
         const diffColor = diff >= 0 ? 'var(--good)' : 'var(--bad)';
         const diffSign = diff >= 0 ? '+' : '';
+        const diffDisplay = v2026 > 0 && diffPct !== '' ? `${diffSign}${fmtFull(diff)} (${diffSign}${diffPct}%)` : '—';
 
         rows.push(`<tr>
           <td><b>${qLabel}</b></td>
@@ -814,7 +818,7 @@
           <td class="amt">${fmtFull(v2024)}</td>
           <td class="amt">${fmtFull(v2025)}</td>
           <td class="amt">${fmtFull(v2026)}</td>
-          <td class="amt" style="color:${diffColor};font-weight:700">${diffSign}${fmtFull(diff)} (${diffSign}${diffPct}%)</td>
+          <td class="amt" style="color:${diffColor};font-weight:700">${diffDisplay}</td>
         </tr>`);
 
         totals[2023] += v2023;
