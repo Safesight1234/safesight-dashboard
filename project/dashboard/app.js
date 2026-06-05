@@ -1077,14 +1077,22 @@
       // Check if XLSX is available, if not try to load it
       if (!window.XLSX) {
         console.log('XLSX not loaded, attempting to load from CDN...');
-        await new Promise((resolve, reject) => {
-          const script = document.createElement('script');
-          script.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.min.js';
-          script.onload = resolve;
-          script.onerror = reject;
-          document.head.appendChild(script);
-        });
-        console.log('XLSX loaded successfully');
+        try {
+          await new Promise((resolve, reject) => {
+            const script = document.createElement('script');
+            script.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.min.js';
+            script.onload = () => {
+              if (window.XLSX) resolve();
+              else reject(new Error('XLSX library did not initialize'));
+            };
+            script.onerror = () => reject(new Error('Failed to load XLSX from CDN'));
+            document.head.appendChild(script);
+          });
+          console.log('XLSX loaded successfully');
+        } catch (loadErr) {
+          console.error('CDN load failed:', loadErr.message);
+          throw new Error('Excel library unavailable: ' + loadErr.message);
+        }
       }
 
       if (!window.XLSX) {
