@@ -295,7 +295,7 @@ const server = http.createServer(async (req, res) => {
   }
 
   // ── API: status ──
-  if (pathname === '/api/status') {
+  if (pathname === '/api/status' || pathname === '/api/tl-status') {
     const t = loadTokens();
     json(200, { connected: !!t.refresh_token, last_sync: t.last_sync || null });
     return;
