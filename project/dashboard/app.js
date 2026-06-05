@@ -253,10 +253,7 @@
 
   function fillKPI(id, won, pipeline, goal, prev, cmp) {
     const pct = goal > 0 ? (won / goal) * 100 : 0;
-    const el = $('#kpi' + id);
-    if (el) {
-      el.innerHTML = fmtMoney(won) + (goal > 0 ? ` <span style="font-size:0.6em;color:var(--ink-dim)">(${pct.toFixed(0)}%)</span>` : '');
-    }
+    $('#kpi' + id).textContent = fmtMoney(won);
     $('#p' + id + 'fill').style.width = Math.min(100, pct) + '%';
     $('#kpi' + id + 'Meta').innerHTML =
       `<span class="goalpct">${pct.toFixed(0)}% of ${fmtMoney(goal)}</span>` +
@@ -553,7 +550,7 @@
       return `<div class="wrow">
         <span class="rank">${i + 1}</span>
         <div class="wrow-main">
-          <div class="wrow-top"><span class="who">${esc(d.t || d.c)}</span>${pipePill(d.pi)}<span class="amt">${fmtMoney(v)}</span></div>
+          <div class="wrow-top"><span class="who">${esc(d.t || d.c)}</span>${pipePill(d.pi)}<span class="amt">${fmtMoney(v)} <span style="font-size:12px;color:var(--ink-faint)">${prob}%</span></span></div>
           <div class="barline"><i style="width:${prob}%"></i></div>
         </div>
       </div>`;
