@@ -1144,6 +1144,17 @@
         const finData = await r.json();
         console.log('Churn data from API:', finData.churnRows?.length || 0, 'rows');
         if (finData.churnRows) {
+          const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+          const parseMonth = (whenStr) => {
+            if (!whenStr) return 0;
+            // Try to find month name
+            const month = monthNames.findIndex(m => whenStr.toLowerCase().includes(m.toLowerCase()));
+            if (month >= 0) return month + 1; // 1-12
+            // Try to parse as MM or M format
+            const num = parseInt(whenStr);
+            return num > 0 && num <= 12 ? num : 0;
+          };
+
           console.log('All churn rows from API:', finData.churnRows.map(r => ({customer: r.customer, when: r.when})));
           churnData = finData.churnRows.filter((row, idx) => {
             if (!row.when) {
@@ -1152,18 +1163,18 @@
             }
             if (granularity === 'quarter') {
               const expectedQuarter = +period - 1;
-              const whenParts = row.when.split('-');
-              const monthVal = parseInt(whenParts[1]) || 0;
-              const q = Math.floor(monthVal / 3);
+              const monthVal = parseMonth(row.when);
+              const q = Math.floor((monthVal - 1) / 3);  // Convert 1-12 to 0-3
               const matches = q === expectedQuarter;
               console.log(`Churn row ${idx}: ${row.customer}, when="${row.when}", monthVal=${monthVal}, q=${q}, expected=${expectedQuarter}, match=${matches}`);
               return matches;
             } else if (granularity === 'month') {
-              const monthVal = parseInt(row.when.split('-')[1]) || 0;
+              const monthVal = parseMonth(row.when);
               return monthVal === +period + 1;
             }
             return true;
           });
+          console.log('Filtered churn data:', churnData.length, 'rows');
         }
         console.log('Filtered churn data:', churnData.length, 'rows');
       } catch (e) {
