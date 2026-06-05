@@ -754,7 +754,7 @@
         const diffPct = v2025 > 0 && v2026 > 0 ? ((diff / v2025) * 100).toFixed(0) : '';
         const diffColor = diff >= 0 ? 'var(--good)' : 'var(--bad)';
         const diffSign = diff >= 0 ? '+' : '';
-        const diffDisplay = v2026 > 0 ? `${diffSign}${fmtFull(diff)} (${diffSign}${diffPct}%)` : '—';
+        const diffDisplay = v2026 > 0 && diffPct !== '' ? `${diffSign}${fmtFull(diff)} (${diffSign}${diffPct}%)` : '—';
 
         rows.push(`<tr>
           <td><b>${qLabel}</b></td>
