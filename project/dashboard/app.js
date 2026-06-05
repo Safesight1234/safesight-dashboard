@@ -648,7 +648,14 @@
     const nlEl = $('#pipeTop');
     if (nlEl) {
       const sub = $('#pipeOpenSub'), tot = $('#pipeTopTot');
-      if (sub) sub.textContent = allOpenDeals.length + ' deals';
+      const noteHead = $('#pipeNoteHead');
+      const noteText = state.quarter === 'all' ? 'All open deals this year' : 'All open deals of selected quarter';
+      const dealCount = allOpenDeals.length + ' deals';
+      if (noteHead) {
+        noteHead.innerHTML = noteText + ' <span class="subh" id="pipeOpenSub">' + dealCount + '</span>';
+      } else if (sub) {
+        sub.textContent = dealCount;
+      }
       if (tot) tot.textContent = fmtMoney(allOpenTotal);
       nlEl.innerHTML = allOpenDeals.length ? allOpenDeals.map((d, i) => {
         const prob = d.prob ? Math.round(d.prob * 100) : 0;
