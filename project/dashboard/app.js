@@ -1199,11 +1199,71 @@
         ]);
       });
 
-      // Create workbook with both sheets
+      // Determine which quarter to show goals for
+      let quarterIndex = -1;
+      if (granularity === 'quarter') {
+        quarterIndex = +period - 1;  // Convert 1-indexed to 0-indexed
+      } else if (granularity === 'month') {
+        quarterIndex = Math.floor(+period / 3);  // Convert 0-indexed month to 0-indexed quarter
+      }
+
+      // Build Goals sheet
+      const goalsData = GOALS[year] || goalsFor(year);
+      const goalsRows = [['Category', 'Goal', 'Achieved', 'Variance', 'Variance %']];
+
+      if (quarterIndex >= 0 && quarterIndex < 4) {
+        // Get goal values for the quarter
+        const nlGoal = goalsData.nl[quarterIndex] || 0;
+        const usGoal = goalsData.us[quarterIndex] || 0;
+        const combGoal = nlGoal + usGoal;
+
+        // Calculate achieved values from filtered deals
+        const nlAchieved = sum(deals.filter(d => d.nl > 0), 'nl');
+        const usAchieved = sum(deals.filter(d => d.us > 0), 'us');
+        const combAchieved = nlAchieved + usAchieved;
+
+        // Helper to calculate variance
+        const calcVariance = (achieved, goal) => {
+          if (goal === 0) return { variance: 0, pct: 0 };
+          const variance = achieved - goal;
+          const pct = (variance / goal) * 100;
+          return { variance, pct };
+        };
+
+        const nlVar = calcVariance(nlAchieved, nlGoal);
+        const usVar = calcVariance(usAchieved, usGoal);
+        const combVar = calcVariance(combAchieved, combGoal);
+
+        goalsRows.push([
+          'New Logo',
+          nlGoal,
+          nlAchieved,
+          nlVar.variance.toFixed(2),
+          nlVar.pct.toFixed(1) + '%'
+        ]);
+        goalsRows.push([
+          'Upsell',
+          usGoal,
+          usAchieved,
+          usVar.variance.toFixed(2),
+          usVar.pct.toFixed(1) + '%'
+        ]);
+        goalsRows.push([
+          'Combined',
+          combGoal,
+          combAchieved,
+          combVar.variance.toFixed(2),
+          combVar.pct.toFixed(1) + '%'
+        ]);
+      }
+
+      // Create workbook with all sheets
       console.log('Creating workbook...');
       const wb = window.XLSX.utils.book_new();
       const wsBookings = window.XLSX.utils.aoa_to_sheet(bookingRows);
       const wsChurn = window.XLSX.utils.aoa_to_sheet(churnRows);
+      const wsGoals = window.XLSX.utils.aoa_to_sheet(goalsRows);
+      window.XLSX.utils.book_append_sheet(wb, wsGoals, 'Goals');
       window.XLSX.utils.book_append_sheet(wb, wsBookings, 'New Bookings');
       window.XLSX.utils.book_append_sheet(wb, wsChurn, 'Churn');
 
