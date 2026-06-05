@@ -50,7 +50,7 @@ exports.handler = async (event) => {
     const churnRows = parseCSV(churnCsv);
 
     // ARR sheet: find header row containing "ARR - Total", data is the next row
-    let arrTotal = 0, total75 = 0;
+    let arrTotal = 0, total75 = 0, awaitingRenewal = 0;
     for (let i = 0; i < arrRows.length - 1; i++) {
       if (arrRows[i].some(c => c.includes('ARR - Total'))) {
         const data = arrRows[i + 1];
@@ -59,6 +59,10 @@ exports.handler = async (event) => {
         total75  = parseMoney(data[hdr.findIndex(c => c.includes('Total (75%)'))]);
         break;
       }
+    }
+    // Get "Awaiting contract renewal" from F6
+    if (arrRows.length > 5 && arrRows[5]) {
+      awaitingRenewal = parseMoney(arrRows[5][5]);
     }
 
     // Churn sheet: find year section, collect individual rows
@@ -89,7 +93,7 @@ exports.handler = async (event) => {
     return {
       statusCode: 200,
       headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
-      body: JSON.stringify({ arrTotal, total75, churnTotal, churnCount, churnRows: churnRowsOut, year }),
+      body: JSON.stringify({ arrTotal, total75, awaitingRenewal, churnTotal, churnCount, churnRows: churnRowsOut, year }),
     };
   } catch (err) {
     return {

@@ -896,18 +896,20 @@
     set('#finGoalNote', 'of ' + fmtMoney(gComb) + ' goal');
 
     // Fetch ARR + Churn from Google Sheets via proxy
-    set('#finARR',        '…');
-    set('#finTotal75',    '…');
-    set('#finChurnTotal', '…');
+    set('#finARR',              '…');
+    set('#finTotal75',          '…');
+    set('#finChurnTotal',       '…');
+    set('#finAwaitingRenewal',  '…');
 
     try {
       const r = await fetch(`/.netlify/functions/finance-data?year=${y}`);
       const d = await r.json();
       if (d.error) throw new Error(d.error);
 
-      set('#finARR',        fmtFull(d.arrTotal));
-      set('#finTotal75',    fmtFull(d.total75));
-      set('#finChurnTotal', fmtMoney(d.churnTotal));
+      set('#finARR',              fmtFull(d.arrTotal));
+      set('#finTotal75',          fmtFull(d.total75));
+      set('#finChurnTotal',       fmtMoney(d.churnTotal));
+      set('#finAwaitingRenewal',  fmtFull(d.awaitingRenewal));
       const churnMeta = $('#finChurnTotalMeta');
       if (churnMeta) churnMeta.textContent = d.churnCount + ' customers · ' + y + ' lost ARR';
       const asOf = $('#finAsOf'); if (asOf) asOf.textContent = '';
@@ -915,6 +917,7 @@
       set('#finARR', 'unavailable');
       set('#finTotal75', 'unavailable');
       set('#finChurnTotal', 'unavailable');
+      set('#finAwaitingRenewal', 'unavailable');
     }
   }
 
