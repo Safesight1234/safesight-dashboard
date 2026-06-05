@@ -79,16 +79,18 @@ exports.handler = async (event) => {
           churnTotal += rev; churnCount++;
           // Get month from column G
           const when = (row[6] || '').trim();
-          churnRowsOut.push({
+          const churnEntry = {
             customer: label,
             industry: (row[2] || '').trim(),
             reason:   (row[3] || '').trim(),
             when,
             revenue:  rev,
-          });
+          };
+          churnRowsOut.push(churnEntry);
         }
       }
     }
+    console.log(`Churn data for year ${year}: ${churnRowsOut.length} entries`);
 
     return {
       statusCode: 200,
