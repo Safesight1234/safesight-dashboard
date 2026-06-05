@@ -1103,10 +1103,19 @@
 
       let deals = wonDealsForYear(year).filter(d => !d.status || d.status === 'won');
       console.log('Total won deals:', deals.length);
+      console.log('Export parameters:', {granularity, year, period});
 
       // Filter deals by selected period
       if (granularity === 'quarter') {
-        deals = deals.filter(d => quarterOf(d.d) === +period - 1);  // quarterOf is 0-indexed
+        const expectedQuarter = +period - 1;
+        console.log('Filtering for quarter:', expectedQuarter, '(period value:', period, ')');
+        const beforeFilter = deals.length;
+        deals = deals.filter(d => {
+          const q = quarterOf(d.d);
+          if (q === expectedQuarter) console.log('  ✓ Match:', d.t, 'quarter:', q);
+          return q === expectedQuarter;
+        });
+        console.log('Deals before filter:', beforeFilter, '→ after filter:', deals.length);
       } else if (granularity === 'month') {
         const monthVal = +period;
         deals = deals.filter(d => monthOf(d.d) === monthVal);
