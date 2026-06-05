@@ -1144,13 +1144,19 @@
         const finData = await r.json();
         console.log('Churn data from API:', finData.churnRows?.length || 0, 'rows');
         if (finData.churnRows) {
-          churnData = finData.churnRows.filter(row => {
-            if (!row.when) return false;
+          console.log('All churn rows from API:', finData.churnRows.map(r => ({customer: r.customer, when: r.when})));
+          churnData = finData.churnRows.filter((row, idx) => {
+            if (!row.when) {
+              console.log(`Churn row ${idx}: ${row.customer} - NO WHEN VALUE`);
+              return false;
+            }
             if (granularity === 'quarter') {
-              const monthVal = parseInt(row.when.split('-')[1]) || 0;
-              const q = Math.floor(monthVal / 3);  // 0-indexed like quarterOf
-              const matches = q === +period - 1;   // period is 1-indexed
-              if (matches) console.log('Churn match:', row.customer, 'month:', monthVal, 'q:', q, 'period:', period);
+              const expectedQuarter = +period - 1;
+              const whenParts = row.when.split('-');
+              const monthVal = parseInt(whenParts[1]) || 0;
+              const q = Math.floor(monthVal / 3);
+              const matches = q === expectedQuarter;
+              console.log(`Churn row ${idx}: ${row.customer}, when="${row.when}", monthVal=${monthVal}, q=${q}, expected=${expectedQuarter}, match=${matches}`);
               return matches;
             } else if (granularity === 'month') {
               const monthVal = parseInt(row.when.split('-')[1]) || 0;
