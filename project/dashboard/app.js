@@ -544,14 +544,19 @@
     const sub = $('#openSub'), tot = $('#openTot');
     if (sub) sub.textContent = arr.length + ' deals';
     if (tot) tot.textContent = fmtMoney(total);
-    openEl.innerHTML = arr.length ? arr.slice(0, 30).map((d, i) => {
+    openEl.innerHTML = arr.length ? arr.slice(0, 30).map(d => {
       const v = d.nl + d.us;
       const prob = d.prob ? Math.round(d.prob * 100) : 0;
-      return `<div class="wrow">
-        <span class="rank">${i + 1}</span>
-        <div class="wrow-main">
-          <div class="wrow-top"><span class="who">${esc(d.t || d.c)}</span>${pipePill(d.pi)}<span class="amt">${fmtMoney(v)} <span style="font-size:12px;color:var(--ink-faint)">${prob}%</span></span></div>
-          <div class="barline"><i style="width:${prob}%"></i></div>
+      return `<div style="padding:8px 0;border-bottom:1px solid var(--line-faint)">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:4px">
+          <div style="flex:1;min-width:0">
+            <div style="font-weight:600;font-size:13px;color:var(--ink)">${esc(d.t || d.c)}</div>
+            <div style="font-size:11px;color:var(--ink-faint)">${esc(d.rep || '—')} · ${prob}%</div>
+          </div>
+          <div style="font-weight:700;font-size:12px;white-space:nowrap">${fmtMoney(v)}</div>
+        </div>
+        <div style="background:var(--line);height:4px;border-radius:2px;overflow:hidden">
+          <div style="height:100%;background:var(--good);width:${prob}%"></div>
         </div>
       </div>`;
     }).join('') : '<div class="empty">No open deals in selection</div>';
