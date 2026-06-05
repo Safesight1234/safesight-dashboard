@@ -1106,7 +1106,7 @@
 
       // Filter deals by selected period
       if (granularity === 'quarter') {
-        deals = deals.filter(d => quarterOf(d.d) === +period);
+        deals = deals.filter(d => quarterOf(d.d) === +period - 1);  // quarterOf is 0-indexed
       } else if (granularity === 'month') {
         const monthVal = +period;
         deals = deals.filter(d => monthOf(d.d) === monthVal);
@@ -1139,8 +1139,8 @@
             if (!row.when) return false;
             if (granularity === 'quarter') {
               const monthVal = parseInt(row.when.split('-')[1]) || 0;
-              const q = Math.ceil(monthVal / 3);
-              const matches = q === +period;
+              const q = Math.floor(monthVal / 3);  // 0-indexed like quarterOf
+              const matches = q === +period - 1;   // period is 1-indexed
               if (matches) console.log('Churn match:', row.customer, 'month:', monthVal, 'q:', q, 'period:', period);
               return matches;
             } else if (granularity === 'month') {
