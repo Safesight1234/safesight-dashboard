@@ -1070,9 +1070,23 @@
   async function doExport(granularity, year, period) {
     try {
       console.log('Export started:', {granularity, year, period});
+
+      // Check if XLSX is available, if not try to load it
       if (!window.XLSX) {
-        toast('Excel library not loaded. Please refresh the page.');
-        console.error('XLSX not available');
+        console.log('XLSX not loaded, attempting to load from CDN...');
+        await new Promise((resolve, reject) => {
+          const script = document.createElement('script');
+          script.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.min.js';
+          script.onload = resolve;
+          script.onerror = reject;
+          document.head.appendChild(script);
+        });
+        console.log('XLSX loaded successfully');
+      }
+
+      if (!window.XLSX) {
+        toast('Excel export not available - library failed to load');
+        console.error('XLSX still not available after loading attempt');
         return;
       }
 
