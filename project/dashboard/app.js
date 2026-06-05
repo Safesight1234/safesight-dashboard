@@ -1080,7 +1080,7 @@
         try {
           await new Promise((resolve, reject) => {
             const script = document.createElement('script');
-            script.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.min.js';
+            script.src = 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
             script.onload = () => {
               if (window.XLSX) resolve();
               else reject(new Error('XLSX library did not initialize'));
