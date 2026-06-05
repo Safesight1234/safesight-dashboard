@@ -252,8 +252,8 @@
   }
 
   function fillKPI(id, won, pipeline, goal, prev, cmp) {
-    $('#kpi' + id).textContent = fmtMoney(won);
     const pct = goal > 0 ? (won / goal) * 100 : 0;
+    $('#kpi' + id).textContent = fmtMoney(won) + (goal > 0 ? ` (${pct.toFixed(0)}%)` : '');
     $('#p' + id + 'fill').style.width = Math.min(100, pct) + '%';
     $('#kpi' + id + 'Meta').innerHTML =
       `<span class="goalpct">${pct.toFixed(0)}% of ${fmtMoney(goal)}</span>` +
@@ -464,13 +464,25 @@
     // Filter to only include deals with NL or US values (exclude renewal-only)
     arr = arr.filter(d => (d.nl_arr + d.nl_oo + d.nl_ob + d.us_arr + d.us_oo + d.us_ob) > 0);
     arr = arr.slice().sort((a, b) => b.d.localeCompare(a.d));
-    body.innerHTML = arr.length ? arr.map(d => {
+    const rows = arr.map(d => {
       const arr_val = d.nl_arr + d.us_arr;
       const oneoff_val = d.nl_oo + d.us_oo;
       const onboard_val = d.nl_ob + d.us_ob;
       const total = arr_val + oneoff_val + onboard_val;
       return `<tr><td class="name">${esc(d.t || d.c)}</td><td>${esc(d.ct || '—')}</td><td>${esc(d.ty || '—')}</td><td class="amt">${fmtFull(arr_val)}</td><td class="amt">${fmtFull(oneoff_val)}</td><td class="amt">${fmtFull(onboard_val)}</td><td class="amt">${fmtFull(total)}</td></tr>`;
-    }).join('') : '<tr><td colspan="7" class="empty">No won deals in selection</td></tr>';
+    });
+
+    if (arr.length) {
+      let totalArr = 0, totalOneoff = 0, totalOnboard = 0;
+      arr.forEach(d => {
+        totalArr += d.nl_arr + d.us_arr;
+        totalOneoff += d.nl_oo + d.us_oo;
+        totalOnboard += d.nl_ob + d.us_ob;
+      });
+      rows.push(`<tr style="background:var(--line-strong);font-weight:700;border-top:2px solid var(--line)"><td>Total</td><td></td><td></td><td class="amt">${fmtFull(totalArr)}</td><td class="amt">${fmtFull(totalOneoff)}</td><td class="amt">${fmtFull(totalOnboard)}</td><td class="amt">${fmtFull(totalArr + totalOneoff + totalOnboard)}</td></tr>`);
+    }
+
+    body.innerHTML = arr.length ? rows.join('') : '<tr><td colspan="7" class="empty">No won deals in selection</td></tr>';
   }
 
   function renderTable(y) {
@@ -640,7 +652,7 @@
         return `<div class="wrow">
           <span class="rank">${i + 1}</span>
           <div class="wrow-main">
-            <div class="wrow-top"><span class="who">${esc(d.t || d.c)}</span><span class="amt">${fmtMoney(v)}</span></div>
+            <div class="wrow-top"><span class="who">${esc(d.t || d.c)}</span><span class="amt">${fmtMoney(v)} <span style="font-size:12px;color:var(--ink-faint)">${prob}%</span></span></div>
             <div class="submeta">${esc(d.rep || '')} · ${prob}% close</div>
             <div class="barline"><i style="width:${prob}%;background:${color}"></i></div>
           </div>
