@@ -1069,9 +1069,15 @@
 
   async function doExport(granularity, year, period) {
     try {
-      if (!window.XLSX) { toast('Excel export not available'); return; }
+      console.log('Export started:', {granularity, year, period});
+      if (!window.XLSX) {
+        toast('Excel library not loaded. Please refresh the page.');
+        console.error('XLSX not available');
+        return;
+      }
 
       let deals = wonDealsForYear(year).filter(d => !d.status || d.status === 'won');
+      console.log('Total won deals:', deals.length);
 
       // Filter deals by selected period
       if (granularity === 'quarter') {
@@ -1080,6 +1086,7 @@
         const monthVal = +period;
         deals = deals.filter(d => monthOf(d.d) === monthVal);
       }
+      console.log('Filtered deals:', deals.length);
 
       // Build New Bookings sheet
       const bookingRows = [['Title', 'Customer Name', 'Date Closed', 'Item Name', 'Amount (Euros)', 'Sales Rep', 'Industry', 'Bookings Type']];
@@ -1131,6 +1138,7 @@
       });
 
       // Create workbook with both sheets
+      console.log('Creating workbook...');
       const wb = window.XLSX.utils.book_new();
       const wsBookings = window.XLSX.utils.aoa_to_sheet(bookingRows);
       const wsChurn = window.XLSX.utils.aoa_to_sheet(churnRows);
@@ -1138,10 +1146,12 @@
       window.XLSX.utils.book_append_sheet(wb, wsChurn, 'Churn');
 
       const fileName = granularity === 'month' ? `safesight-export-${year}-m${(+period + 1).toString().padStart(2, '0')}.xlsx` : granularity === 'quarter' ? `safesight-export-${year}-q${period}.xlsx` : `safesight-export-${year}.xlsx`;
+      console.log('Writing file:', fileName);
       window.XLSX.writeFile(wb, fileName);
-      toast(`Exported bookings & churn for selected period`);
+      toast(`Exported ${bookingRows.length - 1} bookings & ${churnData.length} churn entries`);
       $('#finExportModal').classList.remove('show');
     } catch (e) {
+      console.error('Export error:', e);
       toast('Export failed: ' + e.message);
     }
   }
