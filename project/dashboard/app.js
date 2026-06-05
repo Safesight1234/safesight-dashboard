@@ -1062,7 +1062,10 @@
     updatePeriodSelect();
     modal.classList.add('show');
 
-    $('#finExportDo').onclick = async () => { await doExport(expGran, +yearSel.value, periodSel.value); };
+    $('#finExportDo').onclick = async () => {
+      console.log('Export button clicked. Values:', {expGran, year: yearSel.value, period: periodSel.value});
+      await doExport(expGran, +yearSel.value, periodSel.value);
+    };
     $('#finExportCancel').onclick = () => modal.classList.remove('show');
     $('#finExportClose').onclick = () => modal.classList.remove('show');
   }
@@ -1166,7 +1169,9 @@
       $('#finExportModal').classList.remove('show');
     } catch (e) {
       console.error('Export error:', e);
-      toast('Export failed: ' + e.message);
+      const errMsg = e?.message || e?.toString() || String(e) || 'Unknown error';
+      toast('Export failed: ' + errMsg);
+      console.error('Full error:', JSON.stringify(e, null, 2));
     }
   }
 
