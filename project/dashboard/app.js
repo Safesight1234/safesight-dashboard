@@ -1133,13 +1133,16 @@
       try {
         const r = await fetch(`/.netlify/functions/finance-data?year=${year}`);
         const finData = await r.json();
+        console.log('Churn data from API:', finData.churnRows?.length || 0, 'rows');
         if (finData.churnRows) {
           churnData = finData.churnRows.filter(row => {
             if (!row.when) return false;
             if (granularity === 'quarter') {
               const monthVal = parseInt(row.when.split('-')[1]) || 0;
               const q = Math.ceil(monthVal / 3);
-              return q === +period;
+              const matches = q === +period;
+              if (matches) console.log('Churn match:', row.customer, 'month:', monthVal, 'q:', q, 'period:', period);
+              return matches;
             } else if (granularity === 'month') {
               const monthVal = parseInt(row.when.split('-')[1]) || 0;
               return monthVal === +period + 1;
@@ -1147,6 +1150,7 @@
             return true;
           });
         }
+        console.log('Filtered churn data:', churnData.length, 'rows');
       } catch (e) {
         console.warn('Could not fetch churn data:', e);
       }
