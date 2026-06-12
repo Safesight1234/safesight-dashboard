@@ -1,5 +1,4 @@
 const https = require('https');
-const { readRefreshToken, writeRefreshToken } = require('./token-store');
 
 function httpsPost(hostname, path, body, headers = {}) {
   return new Promise((resolve, reject) => {
@@ -25,8 +24,8 @@ function httpsPost(hostname, path, body, headers = {}) {
 }
 
 async function getAccessToken() {
-  const ghToken     = (process.env.GH_PAT || '').trim();
-  const refreshToken = await readRefreshToken(ghToken);
+  const refreshToken = (process.env.TL_REFRESH_TOKEN || '').trim();
+  if (!refreshToken) throw new Error('TL_REFRESH_TOKEN not set in environment variables');
 
   const result = await httpsPost('focus.teamleader.eu', '/oauth2/access_token', {
     grant_type:    'refresh_token',
@@ -37,11 +36,6 @@ async function getAccessToken() {
 
   if (result.error || !result.access_token) {
     throw new Error(`Token refresh failed: ${JSON.stringify(result)}`);
-  }
-
-  // Save rotated refresh token back to Gist immediately
-  if (result.refresh_token && result.refresh_token !== refreshToken) {
-    await writeRefreshToken(ghToken, result.refresh_token);
   }
 
   return result.access_token;
