@@ -50,24 +50,16 @@ exports.handler = async (event) => {
     if (tokens.error) throw new Error(`Teamleader error: ${tokens.error_description || tokens.error}`);
     if (!tokens.refresh_token) throw new Error(`No refresh token returned. Response: ${JSON.stringify(tokens).slice(0, 200)}`);
 
-    const ghToken    = process.env.GH_PAT;
-    const gistExists = !!process.env.TL_TOKEN_GIST_ID;
-
-    let gistId = process.env.TL_TOKEN_GIST_ID;
-    if (gistExists) {
-      await writeRefreshToken(ghToken, tokens.refresh_token);
-    } else {
-      gistId = await createGistWithToken(ghToken, tokens.refresh_token);
-    }
-
-    const nextStep = gistExists
-      ? `<div class="box">Token saved. Visit <a href="/.netlify/functions/setup">/.netlify/functions/setup</a> to find your pipeline and field IDs.</div>`
-      : `<div class="box">
-          <b>One-time step:</b> Add this to your Netlify environment variables:<br><br>
-          Key: <code>TL_TOKEN_GIST_ID</code><br>
-          Value: <code>${gistId}</code><br><br>
-          Then come back and visit <a href="/.netlify/functions/auth-connect">auth-connect</a> once more — after that everything is automatic.
-        </div>`;
+    const refreshToken = tokens.refresh_token;
+    const nextStep = `<div class="box">
+      <b>Copy this token and add it to Netlify:</b><br><br>
+      Key: <code>TL_REFRESH_TOKEN</code><br>
+      Value: <code style="word-break: break-all;">${refreshToken}</code><br><br>
+      <small>1. Go to Netlify → Site settings → Environment</small><br>
+      <small>2. Add TL_REFRESH_TOKEN with the value above</small><br>
+      <small>3. Deploy</small><br>
+      <small>4. The Sync button will work!</small>
+    </div>`;
 
     return { statusCode: 200, headers: { 'Content-Type': 'text/html' },
       body: page('Connected!', '#34d399', `<h1>✓ Connected to Teamleader!</h1>${nextStep}`) };
